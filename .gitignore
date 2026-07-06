@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# Material del curso y archivos personales: se distribuyen por el canal del
+# curso, no en el repo público
+Datos Modelo*.xls
+*.pptx
+~$*
+.Rhistory
+.claude/settings.local.json
+
+# Duplicado accidental
+01 PRD.md 2
