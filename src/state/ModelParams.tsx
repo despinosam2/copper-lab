@@ -43,6 +43,8 @@ export interface GprState {
   lengthScale: number;
   signalVariance: number;
   noiseVariance: number;
+  /** Ancho de la banda de incertidumbre: 1σ (68%, como la presentación del curso) o 2σ (95%). */
+  bandSigma: 1 | 2;
 }
 
 export interface HybridState {
@@ -87,7 +89,7 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
   });
   const [arima, setArima] = useState<ArimaState>({ p: 2, d: 1 });
   const [arimax, setArimax] = useState<ArimaxState>({ p: 2, d: 1, useGrowth: true, useUsd: true });
-  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05 });
+  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2 });
   const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1 });
 
   return (

@@ -10,32 +10,33 @@ import { Note } from '../components/Note';
 
 export function GprView({ data }: { data: CopperRow[] }) {
   const { gpr, setGpr } = useModelParams();
-  const { lengthScale, signalVariance, noiseVariance } = gpr;
+  const { lengthScale, signalVariance, noiseVariance, bandSigma } = gpr;
   const setLengthScale = (v: number) => setGpr({ ...gpr, lengthScale: v });
   const setSignalVariance = (v: number) => setGpr({ ...gpr, signalVariance: v });
   const setNoiseVariance = (v: number) => setGpr({ ...gpr, noiseVariance: v });
+  const setBandSigma = (v: 1 | 2) => setGpr({ ...gpr, bandSigma: v });
 
   const { chartData, metrics } = useMemo(() => {
     const y = data.map(r => r.price);
     const x = Array(data.length).fill(0).map((_, i) => i / (data.length > 1 ? data.length - 1 : 1));
-    
+
     const model = fitGpr(x, y, { lengthScale, signalVariance, noiseVariance });
-    
+
     const chartData = data.map((row, i) => {
       const stdDev = Math.sqrt(Math.max(0, model.variance[i]));
       return {
         date: row.date,
         Actual: row.price,
         Model: model.mean[i],
-        Upper: model.mean[i] + 2 * stdDev,
-        Lower: Math.max(0, model.mean[i] - 2 * stdDev) // Ensure no negative prices in band
+        Upper: model.mean[i] + bandSigma * stdDev,
+        Lower: Math.max(0, model.mean[i] - bandSigma * stdDev) // Ensure no negative prices in band
       };
     });
 
     const metrics = calculateMetrics(y, model.mean);
 
     return { chartData, metrics };
-  }, [data, lengthScale, signalVariance, noiseVariance]);
+  }, [data, lengthScale, signalVariance, noiseVariance, bandSigma]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,14 +48,15 @@ export function GprView({ data }: { data: CopperRow[] }) {
               { key: 'Actual', name: 'Observado', color: '#78838d', strokeWidth: 2, strokeDasharray: '4 4' },
               { key: 'Model', name: 'Modelo (Media)', color: '#e0a274', strokeWidth: 2 }
             ]}
-            area={{ keyLower: 'Lower', keyUpper: 'Upper', color: '#4fb3a0', name: 'Incertidumbre ±2σ' }}
+            area={{ keyLower: 'Lower', keyUpper: 'Upper', color: '#4fb3a0', name: `Incertidumbre ±${bandSigma}σ` }}
           />
         </Panel>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Panel title={metrics.rmse.toFixed(3)} eyebrow="RMSE" />
           <Panel title={metrics.mae.toFixed(3)} eyebrow="MAE" />
           <Panel title={metrics.mape.toFixed(1) + '%'} eyebrow="MAPE" />
+          <Panel title={metrics.r2.toFixed(4)} eyebrow="R²" />
         </div>
 
         <Note>
@@ -67,6 +69,29 @@ export function GprView({ data }: { data: CopperRow[] }) {
           <Slider label="Escala de Longitud (l)" min={0.01} max={0.5} step={0.01} value={lengthScale} onChange={setLengthScale} />
           <Slider label="Varianza Señal (σf²)" min={0.1} max={5.0} step={0.1} value={signalVariance} onChange={setSignalVariance} />
           <Slider label="Varianza Ruido (σn²)" min={0.001} max={0.5} step={0.001} value={noiseVariance} onChange={setNoiseVariance} />
+        </Panel>
+
+        <Panel title="Banda de incertidumbre" eyebrow="VISUALIZACIÓN">
+          <div className="flex gap-2" role="group" aria-label="Ancho de la banda de incertidumbre">
+            {([1, 2] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setBandSigma(s)}
+                aria-pressed={bandSigma === s}
+                className={`flex-1 px-3 py-2 rounded-[3px] border font-mono text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina ${
+                  bandSigma === s
+                    ? 'border-patina text-patina-light bg-patina/10'
+                    : 'border-slate-700 text-ink-300 hover:text-ink-100'
+                }`}
+              >
+                ±{s}σ ({s === 1 ? '68%' : '95%'})
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ink-500 font-body mt-3 leading-relaxed">
+            La presentación del curso usa ±1σ (68% de cobertura); ±2σ cubre el 95%.
+            Es la misma incertidumbre, distinto nivel de confianza.
+          </p>
         </Panel>
       </div>
     </div>

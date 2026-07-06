@@ -74,10 +74,11 @@ export function HybridView({ data }: { data: CopperRow[] }) {
           />
         </Panel>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Panel title={hybridMetrics.rmse.toFixed(3)} eyebrow="RMSE HÍBRIDO" />
           <Panel title={arimaxMetrics.rmse.toFixed(3)} eyebrow="RMSE ARIMAX" />
           <Panel title={`${improvement > 0 ? '+' : ''}${improvement.toFixed(1)}%`} eyebrow="MEJORA (RMSE)" />
+          <Panel title={hybridMetrics.r2.toFixed(4)} eyebrow="R² HÍBRIDO" />
         </div>
 
         <Note>

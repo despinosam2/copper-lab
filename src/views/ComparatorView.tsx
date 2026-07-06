@@ -86,6 +86,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
                 <th className="pb-3 font-medium text-right">RMSE</th>
                 <th className="pb-3 font-medium text-right">MAE</th>
                 <th className="pb-3 font-medium text-right">MAPE</th>
+                <th className="pb-3 font-medium text-right">R²</th>
               </tr>
             </thead>
             <tbody>
@@ -101,6 +102,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
                     <td className={`py-4 text-right font-mono ${isWinner ? 'text-patina font-semibold' : 'text-ink-100'}`}>{row.rmse.toFixed(3)}</td>
                     <td className="py-4 text-right font-mono text-ink-100">{row.mae.toFixed(3)}</td>
                     <td className="py-4 text-right font-mono text-ink-100">{row.mape.toFixed(2)}%</td>
+                    <td className="py-4 text-right font-mono text-ink-100">{row.r2.toFixed(4)}</td>
                   </tr>
                 );
               })}

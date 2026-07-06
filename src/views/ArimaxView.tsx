@@ -56,10 +56,11 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
           />
         </Panel>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Panel title={metrics.rmse.toFixed(3)} eyebrow="RMSE" />
           <Panel title={metrics.mae.toFixed(3)} eyebrow="MAE" />
           <Panel title={metrics.mape.toFixed(1) + '%'} eyebrow="MAPE" />
+          <Panel title={metrics.r2.toFixed(4)} eyebrow="R²" />
         </div>
 
         <Note>
