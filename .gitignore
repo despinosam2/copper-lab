@@ -10,6 +10,8 @@ Datos Modelo*.xls
 ~$*
 .Rhistory
 .claude/settings.local.json
+# Guion del expositor (contiene las respuestas — no publicar a los estudiantes)
+GUION DE CLASE.md
 
 # Duplicado accidental
 01 PRD.md 2
