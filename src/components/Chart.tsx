@@ -56,6 +56,9 @@ export function Chart({ data, lines, area }: ChartProps) {
               if (typeof value === 'number') {
                 return value.toFixed(3);
               }
+              if (Array.isArray(value)) {
+                return value.map(v => (typeof v === 'number' ? v.toFixed(3) : v)).join(' – ');
+              }
               return value;
             }}
           />
