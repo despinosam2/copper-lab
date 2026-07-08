@@ -52,6 +52,12 @@ export function Chart({ data, lines, area }: ChartProps) {
           <Tooltip 
             contentStyle={{ backgroundColor: '#171c22', border: '1px solid #28313b', borderRadius: '3px', color: '#e8ecef', fontFamily: 'IBM Plex Mono' }}
             itemStyle={{ fontFamily: 'IBM Plex Mono' }}
+            formatter={(value: any) => {
+              if (typeof value === 'number') {
+                return value.toFixed(3);
+              }
+              return value;
+            }}
           />
           
           {area && (
