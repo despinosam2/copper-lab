@@ -1,12 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CopperRow } from '../data/generator';
 import { useModelParams } from '../state/ModelParams';
-import { fitGpr } from '../models/gpr';
+import { fitGpr, autoTuneGpr } from '../models/gpr';
 import { calculateMetrics } from '../models/metrics';
 import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
+
+const AUTOTUNE_BOUNDS = {
+  lengthScale: [0.01, 0.5] as [number, number],
+  signalVariance: [0.1, 5.0] as [number, number],
+  noiseVariance: [0.001, 0.5] as [number, number]
+};
 
 export function GprView({ data }: { data: CopperRow[] }) {
   const { gpr, setGpr } = useModelParams();
@@ -15,6 +21,20 @@ export function GprView({ data }: { data: CopperRow[] }) {
   const setSignalVariance = (v: number) => setGpr({ ...gpr, signalVariance: v });
   const setNoiseVariance = (v: number) => setGpr({ ...gpr, noiseVariance: v });
   const setBandSigma = (v: 1 | 2) => setGpr({ ...gpr, bandSigma: v });
+
+  const [autoTuning, setAutoTuning] = useState(false);
+  const handleAutoTune = () => {
+    setAutoTuning(true);
+    // setTimeout(0): deja pintar "Calculando…" antes de iniciar la búsqueda
+    // (autoTuneGpr además cede el hilo internamente durante la grilla).
+    setTimeout(async () => {
+      const y = data.map(r => r.price);
+      const x = Array(data.length).fill(0).map((_, i) => i / (data.length > 1 ? data.length - 1 : 1));
+      const best = await autoTuneGpr(x, y, AUTOTUNE_BOUNDS);
+      setGpr({ ...gpr, ...best });
+      setAutoTuning(false);
+    }, 0);
+  };
 
   const { chartData, metrics } = useMemo(() => {
     const y = data.map(r => r.price);
@@ -69,6 +89,20 @@ export function GprView({ data }: { data: CopperRow[] }) {
           <Slider label="Escala de Longitud (l)" min={0.01} max={0.5} step={0.01} value={lengthScale} onChange={setLengthScale} />
           <Slider label="Varianza Señal (σf²)" min={0.1} max={5.0} step={0.1} value={signalVariance} onChange={setSignalVariance} />
           <Slider label="Varianza Ruido (σn²)" min={0.001} max={0.5} step={0.001} value={noiseVariance} onChange={setNoiseVariance} />
+
+          <button
+            onClick={handleAutoTune}
+            disabled={autoTuning}
+            className="mt-6 w-full px-4 py-2 text-sm font-medium font-body bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-wait text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+          >
+            {autoTuning ? 'Calculando…' : 'Autoajustar (verosimilitud marginal)'}
+          </button>
+          <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
+            Busca los valores de l, σf² y σn² que mejor explican estos datos según el
+            criterio estándar de la literatura (máxima verosimilitud marginal), en vez
+            de ajustarlos a ojo. Compara dónde los deja el algoritmo con dónde los
+            habías dejado tú.
+          </p>
         </Panel>
 
         <Panel title="Banda de incertidumbre" eyebrow="VISUALIZACIÓN">

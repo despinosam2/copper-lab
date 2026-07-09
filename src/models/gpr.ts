@@ -86,3 +86,93 @@ export function fitGpr(x: number[], y: number[], params: GprParams): GprResult {
 
   return { mean, variance };
 }
+
+export interface GprBounds {
+  lengthScale: [number, number];
+  signalVariance: [number, number];
+  noiseVariance: [number, number];
+}
+
+/** steps valores espaciados geométricamente entre min y max (ambos incluidos). */
+function logspace(min: number, max: number, steps: number): number[] {
+  const logMin = Math.log(min);
+  const logMax = Math.log(max);
+  const out: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    const t = steps === 1 ? 0 : i / (steps - 1);
+    out.push(Math.exp(logMin + t * (logMax - logMin)));
+  }
+  return out;
+}
+
+/**
+ * −log p(y|X): verosimilitud marginal negativa de un GPR para una
+ * combinación de hiperparámetros. Reutiliza la misma factorización de
+ * Cholesky que fitGpr — es literalmente el mismo cálculo, evaluado para
+ * comparar hiperparámetros en vez de para predecir.
+ */
+function negLogMarginalLikelihood(x: number[], yc: number[], l: number, sigmaF2: number, sigmaN2: number): number {
+  const n = x.length;
+  const K: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      K[i][j] = rbf(x[i], x[j], l, sigmaF2);
+      if (i === j) K[i][j] += sigmaN2;
+    }
+  }
+  const L = cholesky(K);
+  const z = forwardSolve(L, yc);
+  const alpha = backwardSolve(L, z);
+
+  let quad = 0;
+  for (let i = 0; i < n; i++) quad += yc[i] * alpha[i]; // yᵀK⁻¹y
+
+  let logDet = 0;
+  for (let i = 0; i < n; i++) logDet += Math.log(Math.max(L[i][i], 1e-12));
+  logDet *= 2; // log|K| = 2·Σ log(Lᵢᵢ)
+
+  return 0.5 * quad + 0.5 * logDet + (n / 2) * Math.log(2 * Math.PI);
+}
+
+/**
+ * Busca (l, σf², σn²) que maximizan la verosimilitud marginal — el criterio
+ * estándar en la literatura de GPR (Rasmussen & Williams, cap. 5) — por
+ * búsqueda en grilla logarítmica dentro de los rangos de los sliders.
+ *
+ * Se usa grilla en vez de descenso por gradiente a propósito: siempre
+ * termina en tiempo acotado y no depende de un punto de partida, coherente
+ * con que ningún cálculo de la app use optimización iterativa que pueda
+ * fallar en vivo (mismo principio que evita el término MA en ARIMA).
+ *
+ * Es asíncrona y cede el hilo tras cada valor de l: la grilla completa puede
+ * tomar más de un segundo, y sin ceder el hilo el navegador se congela por
+ * completo durante la búsqueda (ni siquiera pinta "Calculando…").
+ */
+export async function autoTuneGpr(x: number[], y: number[], bounds: GprBounds, steps = 6): Promise<GprParams> {
+  const n = y.length;
+  const yMean = y.reduce((s, v) => s + v, 0) / n;
+  const yStd = Math.max(Math.sqrt(y.reduce((s, v) => s + (v - yMean) ** 2, 0) / n), 1e-9);
+  const yc = y.map(v => (v - yMean) / yStd);
+
+  const lVals = logspace(bounds.lengthScale[0], bounds.lengthScale[1], steps);
+  const sf2Vals = logspace(bounds.signalVariance[0], bounds.signalVariance[1], steps);
+  const sn2Vals = logspace(bounds.noiseVariance[0], bounds.noiseVariance[1], steps);
+
+  let best: GprParams = { lengthScale: lVals[0], signalVariance: sf2Vals[0], noiseVariance: sn2Vals[0] };
+  let bestNll = Infinity;
+
+  for (const l of lVals) {
+    for (const sf2 of sf2Vals) {
+      for (const sn2 of sn2Vals) {
+        const nll = negLogMarginalLikelihood(x, yc, l, sf2, sn2);
+        if (nll < bestNll) {
+          bestNll = nll;
+          best = { lengthScale: l, signalVariance: sf2, noiseVariance: sn2 };
+        }
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  return best;
+}
