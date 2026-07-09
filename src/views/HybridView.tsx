@@ -19,8 +19,10 @@ export function HybridView({ data }: { data: CopperRow[] }) {
 
   const { chartData, hybridMetrics, arimaxMetrics, improvement } = useMemo(() => {
     const y = data.map(r => r.price);
-    const exog = data.map(r => [r.globalGrowth, r.usdIndex]);
-    
+    // El híbrido no tiene toggles propios: usa siempre las 5 exógenas disponibles
+    // (crecimiento, dólar, inventarios, libor, posición especulativa).
+    const exog = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
+
     // Fit isolated ARIMAX for comparison
     const arimaxModel = fitArimax(y, exog, p, d);
     const actualArimax = y.slice(p + d);
@@ -67,7 +69,9 @@ export function HybridView({ data }: { data: CopperRow[] }) {
             data={chartData}
             lines={[
               { key: 'Actual', name: 'Observado', color: '#78838d', strokeWidth: 2, strokeDasharray: '4 4' },
-              { key: 'ArimaxOnly', name: 'ARIMAX Base', color: '#aab4bd', strokeWidth: 1, strokeDasharray: '2 2' },
+              // Violeta: distinguible del gris de "Observado" y del cobre de "Híbrido"
+              // (antes casi calcaba el tono del observado y no se distinguía a simple vista).
+              { key: 'ArimaxOnly', name: 'ARIMAX Base', color: '#9b8cd6', strokeWidth: 1.5, strokeDasharray: '3 3' },
               { key: 'Model', name: 'Híbrido', color: '#e0a274', strokeWidth: 2 }
             ]}
             area={{ keyLower: 'Lower', keyUpper: 'Upper', color: '#4fb3a0', name: 'Incertidumbre ±2σ' }}

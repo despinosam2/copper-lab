@@ -37,6 +37,9 @@ export interface ArimaxState {
   d: number;
   useGrowth: boolean;
   useUsd: boolean;
+  useStocks: boolean;
+  useLibor: boolean;
+  usePartLargas: boolean;
 }
 
 export interface GprState {
@@ -88,7 +91,15 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     shockQuarter: 8
   });
   const [arima, setArima] = useState<ArimaState>({ p: 2, d: 1 });
-  const [arimax, setArimax] = useState<ArimaxState>({ p: 2, d: 1, useGrowth: true, useUsd: true });
+  const [arimax, setArimax] = useState<ArimaxState>({
+    p: 2,
+    d: 1,
+    useGrowth: true,
+    useUsd: true,
+    useStocks: false,
+    useLibor: false,
+    usePartLargas: false
+  });
   const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2 });
   const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1 });
 

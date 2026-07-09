@@ -10,18 +10,27 @@ export interface ParseResult {
   errors?: string[];
 }
 
-// Alias de columnas reconocidas, en minúsculas (el matching ignora mayúsculas
-// y espacios). Incluye los nombres del dataset real del curso:
-// "Precio", "Dolarindex", "Pindustrial", y la primera columna sin encabezado
-// (SheetJS la expone como "__EMPTY"), que suele traer el período.
+// Alias de columnas reconocidas, en minúsculas y sin espacios/guiones bajos
+// (el matching normaliza ambos lados). Incluye los nombres del dataset real
+// del curso: "Precio", "Dolarindex", "Pindustrial", "Stocks", "Libor",
+// "PartLargas", y la primera columna sin encabezado (SheetJS la expone como
+// "__EMPTY"), que suele traer el período.
 const PRICE_ALIASES = ['price', 'precio'];
 const DATE_ALIASES = ['date', 'fecha', 'periodo', 'período', 'trimestre', 'mes', '__empty'];
 const GROWTH_ALIASES = ['globalgrowth', 'growth', 'crecimiento', 'pindustrial', 'actividad'];
 const USD_ALIASES = ['usdindex', 'usd', 'dolarindex', 'dólarindex', 'dolar', 'dólar', 'dxy'];
+const STOCKS_ALIASES = ['stocks', 'inventario', 'inventarios', 'inventory'];
+const LIBOR_ALIASES = ['libor', 'tasalibor', 'indicelibor'];
+const PART_LARGAS_ALIASES = ['partlargas', 'posicionespeculativa', 'netlong', 'speculativepositioning'];
+
+function normalize(s: string): string {
+  return s.trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
 
 function findValue(row: any, aliases: string[]): unknown {
+  const normAliases = aliases.map(normalize);
   for (const key of Object.keys(row)) {
-    if (aliases.includes(key.trim().toLowerCase())) return row[key];
+    if (normAliases.includes(normalize(key))) return row[key];
   }
   return undefined;
 }
@@ -79,12 +88,24 @@ export function validateRows(rawRows: any[]): { success: boolean, data?: CopperR
     const rawUsd = findValue(row, USD_ALIASES);
     const usdIndex = isEmpty(rawUsd) ? 100 : parseFloat(String(rawUsd));
 
+    const rawStocks = findValue(row, STOCKS_ALIASES);
+    const stocks = isEmpty(rawStocks) ? 4 : parseFloat(String(rawStocks));
+
+    const rawLibor = findValue(row, LIBOR_ALIASES);
+    const libor = isEmpty(rawLibor) ? 100 : parseFloat(String(rawLibor));
+
+    const rawPartLargas = findValue(row, PART_LARGAS_ALIASES);
+    const partLargas = isEmpty(rawPartLargas) ? 0.7 : parseFloat(String(rawPartLargas));
+
     parsedRows.push({
       date,
       t: parsedRows.length,
       price,
       globalGrowth: isNaN(globalGrowth) ? 2.5 : globalGrowth,
-      usdIndex: isNaN(usdIndex) ? 100 : usdIndex
+      usdIndex: isNaN(usdIndex) ? 100 : usdIndex,
+      stocks: isNaN(stocks) ? 4 : stocks,
+      libor: isNaN(libor) ? 100 : libor,
+      partLargas: isNaN(partLargas) ? 0.7 : partLargas
     });
   }
 

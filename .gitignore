@@ -7,6 +7,8 @@ dist
 # curso, no en el repo público
 Datos Modelo*.xls
 *.pptx
+Presentation_*.pdf
+render-v4/
 ~$*
 .Rhistory
 .claude/settings.local.json

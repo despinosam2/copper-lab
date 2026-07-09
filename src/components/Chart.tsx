@@ -6,10 +6,19 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   ComposedChart,
   Area
 } from 'recharts';
+
+/** Redondea a 2 decimales; formatea rangos [lower, upper] como "142.38 – 198.29". */
+function formatTooltipValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(v => (typeof v === 'number' ? v.toFixed(2) : v)).join(' – ');
+  }
+  return typeof value === 'number' ? value.toFixed(2) : String(value);
+}
 
 interface ChartProps {
   data: any[];
@@ -49,11 +58,28 @@ export function Chart({ data, lines, area }: ChartProps) {
             tickFormatter={(val) => val.toFixed(1)}
             width={55}
           />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#171c22', border: '1px solid #28313b', borderRadius: '3px', color: '#e8ecef', fontFamily: 'IBM Plex Mono' }}
-            itemStyle={{ fontFamily: 'IBM Plex Mono' }}
+          <Tooltip
+            contentStyle={{
+              backgroundColor: '#171c22',
+              border: '1px solid #28313b',
+              borderRadius: '3px',
+              color: '#e8ecef',
+              fontFamily: 'IBM Plex Mono',
+              fontSize: 12,
+              padding: '8px 10px'
+            }}
+            labelStyle={{ color: '#e8ecef', marginBottom: 4 }}
+            itemStyle={{ fontFamily: 'IBM Plex Mono', padding: 0 }}
+            // Sin esto, valores sin redondear (o el rango [lower, upper] de la
+            // banda de incertidumbre) podían salir con muchos decimales y
+            // ensanchar el recuadro hasta tapar buena parte del gráfico.
+            formatter={(value: unknown, name: string) => [formatTooltipValue(value), name]}
           />
-          
+          <Legend
+            wrapperStyle={{ fontFamily: 'IBM Plex Mono', fontSize: 12, color: '#aab4bd', paddingTop: 8 }}
+            iconType="plainline"
+          />
+
           {area && (
             // Área de rango nativa de Recharts: dataKey devuelve [inferior, superior]
             <Area

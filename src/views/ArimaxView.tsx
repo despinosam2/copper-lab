@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CopperRow } from '../data/generator';
 import { useModelParams } from '../state/ModelParams';
+import { EXOG_DEFS, buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { fitArimax } from '../models/arimax';
 import { calculateMetrics } from '../models/metrics';
 import { Panel } from '../components/Panel';
@@ -11,25 +12,17 @@ import { Note } from '../components/Note';
 
 export function ArimaxView({ data }: { data: CopperRow[] }) {
   const { arimax, setArimax } = useModelParams();
-  const { p, d, useGrowth, useUsd } = arimax;
+  const { p, d } = arimax;
   const setP = (v: number) => setArimax({ ...arimax, p: v });
   const setD = (v: number) => setArimax({ ...arimax, d: v });
-  const setUseGrowth = (v: boolean) => setArimax({ ...arimax, useGrowth: v });
-  const setUseUsd = (v: boolean) => setArimax({ ...arimax, useUsd: v });
 
-  const { chartData, metrics, coefficients, exogCoefficients } = useMemo(() => {
+  const { chartData, metrics, coefficients, exogCoefficients, activeDefs } = useMemo(() => {
     const y = data.map(r => r.price);
-    
-    // Build exog matrix
-    const exog = data.map(r => {
-      const row = [];
-      if (useGrowth) row.push(r.globalGrowth);
-      if (useUsd) row.push(r.usdIndex);
-      return row;
-    });
+    const exog = buildExogMatrix(data, arimax);
+    const activeDefs = activeExogDefs(arimax);
 
     const model = fitArimax(y, exog, p, d);
-    
+
     const chartData = data.map((row, i) => ({
       date: row.date,
       Actual: row.price,
@@ -40,8 +33,8 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
     const pred = model.fitted.slice(p + d);
     const metrics = calculateMetrics(actual, pred);
 
-    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients };
-  }, [data, p, d, useGrowth, useUsd]);
+    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients, activeDefs };
+  }, [data, arimax, p, d]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -74,14 +67,17 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
           <Slider label="Diferenciación (d)" min={0} max={2} step={1} value={d} onChange={setD} />
           
           <div className="mt-6 flex flex-col gap-3">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input type="checkbox" checked={useGrowth} onChange={e => setUseGrowth(e.target.checked)} className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina" />
-              <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">Incluir Crecimiento Global</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input type="checkbox" checked={useUsd} onChange={e => setUseUsd(e.target.checked)} className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina" />
-              <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">Incluir Índice Dólar</span>
-            </label>
+            {EXOG_DEFS.map(def => (
+              <label key={def.flag} className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={arimax[def.flag]}
+                  onChange={e => setArimax({ ...arimax, [def.flag]: e.target.checked })}
+                  className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina"
+                />
+                <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">{def.label}</span>
+              </label>
+            ))}
           </div>
         </Panel>
 
@@ -90,12 +86,15 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
             {coefficients.map((coef, idx) => (
               <Readout key={idx} label={`φ${idx + 1}`} value={coef.toFixed(3)} />
             ))}
-            {useGrowth && exogCoefficients[0] !== undefined && (
-              <Readout label="β (Crecimiento)" value={exogCoefficients[0].toFixed(3)} />
-            )}
-            {useUsd && exogCoefficients[useGrowth ? 1 : 0] !== undefined && (
-              <Readout label="β (Dólar)" value={exogCoefficients[useGrowth ? 1 : 0].toFixed(3)} />
-            )}
+            {activeDefs.map((def, idx) => (
+              exogCoefficients[idx] !== undefined && (
+                <Readout
+                  key={def.key}
+                  label={`β (${def.shortLabel[0].toUpperCase()}${def.shortLabel.slice(1)})`}
+                  value={exogCoefficients[idx].toFixed(3)}
+                />
+              )
+            ))}
           </div>
         </Panel>
       </div>

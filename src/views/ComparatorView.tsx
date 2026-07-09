@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CopperRow } from '../data/generator';
 import { useModelParams } from '../state/ModelParams';
+import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { fitArima } from '../models/arima';
 import { fitArimax } from '../models/arimax';
 import { fitGpr } from '../models/gpr';
@@ -17,7 +18,8 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
   const comparison = useMemo(() => {
     const y = data.map(r => r.price);
     const x_gpr = Array(data.length).fill(0).map((_, i) => i / (data.length > 1 ? data.length - 1 : 1));
-    const allExog = data.map(r => [r.globalGrowth, r.usdIndex]);
+    // El híbrido no tiene toggles propios (pestaña 05): usa siempre las 5 exógenas disponibles.
+    const allExog = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
 
     // Cada modelo se evalúa sólo sobre su tramo predicho (los primeros p+d
     // puntos no tienen predicción en los autorregresivos).
@@ -29,13 +31,8 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
     const metArima = metricsFrom(mArima.fitted, arima.p + arima.d);
 
     // ARIMAX — configuración de la pestaña 03 (incluye toggles de covariables)
-    const axExog = data.map(r => {
-      const row = [];
-      if (arimax.useGrowth) row.push(r.globalGrowth);
-      if (arimax.useUsd) row.push(r.usdIndex);
-      return row;
-    });
-    const axCovars = [arimax.useGrowth && 'crecimiento', arimax.useUsd && 'dólar'].filter(Boolean);
+    const axExog = buildExogMatrix(data, arimax);
+    const axCovars = activeExogDefs(arimax).map(def => def.shortLabel);
     const mArimax = fitArimax(y, axExog, arimax.p, arimax.d);
     const metArimax = metricsFrom(mArimax.fitted, arimax.p + arimax.d);
 

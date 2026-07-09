@@ -4,6 +4,12 @@ export interface CopperRow {
   price: number;
   globalGrowth: number;
   usdIndex: number;
+  /** Inventarios / semanas de cobertura — columna "Stocks" del dataset del curso. */
+  stocks: number;
+  /** Índice de tasa de referencia — columna "Libor" del dataset del curso. */
+  libor: number;
+  /** Posición especulativa neta larga (fracción 0–1) — columna "PartLargas". */
+  partLargas: number;
 }
 
 // PRNG: Mulberry32
@@ -40,6 +46,13 @@ export function generateSyntheticData(seed: number = 42, noiseLevel: number = 0.
     const globalGrowth = 2.5 + 1.5 * Math.sin(t / 20) + growthNoise;
     const usdIndex = 100 + 10 * Math.sin((t / 15) + Math.PI) + usdNoise;
 
+    // Covariables adicionales del dataset del curso (Stocks, Libor, PartLargas):
+    // mismo estilo cíclico + ruido, para que los sliders de ARIMAX tengan
+    // señal también con el dataset sintético.
+    const stocks = Math.max(0.5, 4 + 1.2 * Math.sin((t / 18) + 1) + gaussianRandom(prng) * 0.6);
+    const libor = 100 + 4 * Math.sin((t / 22) + 0.5) + gaussianRandom(prng) * 1.0;
+    const partLargas = Math.min(0.98, Math.max(0.4, 0.75 + 0.12 * Math.sin((t / 25) + 2) + gaussianRandom(prng) * 0.04));
+
     // Price components
     const trend = 3.2 + 0.012 * t;
     const seasonality = 0.25 * Math.sin(2 * Math.PI * t / 12);
@@ -57,7 +70,10 @@ export function generateSyntheticData(seed: number = 42, noiseLevel: number = 0.
       t,
       price: Math.max(0, price), // ensuring price is positive
       globalGrowth,
-      usdIndex
+      usdIndex,
+      stocks,
+      libor,
+      partLargas
     });
   }
 
