@@ -12,8 +12,10 @@ render-v4/
 ~$*
 .Rhistory
 .claude/settings.local.json
-# Guion del expositor (contiene las respuestas — no publicar a los estudiantes)
+# Guion del expositor y banco de preguntas (contienen las respuestas — no
+# publicar a los estudiantes)
 GUION DE CLASE.md
+BANCO DE PREGUNTAS.md
 
 # Duplicado accidental
 01 PRD.md 2
