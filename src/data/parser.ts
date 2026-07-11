@@ -39,6 +39,76 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 }
 
+/**
+ * R02 (bug B1): parsea números respetando el formato decimal local, en vez
+ * de parseFloat, que trunca en silencio en la coma decimal ("4,23" → 4) y
+ * acepta basura al final ("4.23abc" → 4.23). Usa Number() al final, que
+ * devuelve NaN ante cualquier resto no numérico — así ambos problemas se
+ * cierran a la vez.
+ *
+ * Regla: si hay coma y punto, el separador que aparece MÁS A LA DERECHA es
+ * el decimal. Si sólo hay coma, se asume separador de miles cuando TODOS
+ * los grupos después del primero tienen exactamente 3 dígitos (ambiguo con
+ * pocos grupos, ver 09 EXECUTION BLUEPRINT §0-D-C); si no, la ÚLTIMA coma
+ * es el separador decimal.
+ */
+function parseLocaleNumber(raw: string): number {
+  const s = raw.trim();
+  if (/^-?\d+$/.test(s)) return Number(s);
+
+  const hasComma = s.includes(',');
+  const hasDot = s.includes('.');
+
+  if (hasComma && hasDot) {
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    const normalized =
+      lastComma > lastDot
+        ? s.replace(/\./g, '').replace(',', '.') // coma decimal, punto de miles
+        : s.replace(/,/g, ''); // punto decimal, coma de miles
+    return Number(normalized);
+  }
+
+  if (hasComma) {
+    const groups = s.split(',');
+    const afterFirst = groups.slice(1);
+    const allThreeDigitGroups = afterFirst.length > 0 && afterFirst.every(g => /^\d{3}$/.test(g));
+    if (allThreeDigitGroups) {
+      return Number(groups.join(''));
+    }
+    // Última coma = separador decimal; se quitan las comas anteriores (de miles).
+    const lastComma = s.lastIndexOf(',');
+    const normalized = s.slice(0, lastComma).replace(/,/g, '') + '.' + s.slice(lastComma + 1);
+    return Number(normalized);
+  }
+
+  return Number(s); // sólo punto, o ni coma ni punto: comportamiento estándar
+}
+
+/**
+ * R02 (hallazgo adicional, descubierto al implementar el fix de B1): sin
+ * esto, un CSV real en es-CL/es-ES (';' como separador de campo, ',' como
+ * decimal — el formato que exportan Excel/Numbers en esa configuración
+ * regional) ni siquiera separa columnas correctamente: SheetJS asume ','
+ * como separador salvo que se le indique lo contrario.
+ *
+ * Heurística: si el archivo es texto plano (no un binario real de Excel) y
+ * su primera línea tiene más ';' que ',', se asume separador ';'. Los
+ * binarios reales (.xlsx = ZIP, .xls = OLE2) tienen bytes nulos muy al
+ * inicio y nunca entran a esta rama — verificado contra el Excel del curso.
+ */
+export function sniffCsvFieldSeparator(bytes: Uint8Array): ';' | undefined {
+  const head = bytes.slice(0, 8);
+  for (const b of head) {
+    if (b === 0) return undefined; // binario (ZIP/OLE2 empiezan con NUL)
+  }
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes.slice(0, 2000));
+  const firstLine = text.split(/\r?\n/)[0] ?? '';
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  const commas = (firstLine.match(/,/g) || []).length;
+  return semicolons > commas ? ';' : undefined;
+}
+
 /** Formatea la fecha; los períodos numéricos tipo 1986.2 se redondean a un decimal. */
 function formatDate(rawDate: unknown, fallbackIndex: number): string {
   if (isEmpty(rawDate)) return `T+${fallbackIndex}`;
@@ -67,7 +137,7 @@ export function validateRows(rawRows: any[]): { success: boolean, data?: CopperR
     // reales suelen traer filas finales de proyección aún sin precio observado.
     if (isEmpty(rawPrice)) continue;
 
-    const price = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice));
+    const price = typeof rawPrice === 'number' ? rawPrice : parseLocaleNumber(String(rawPrice));
 
     if (isNaN(price)) {
       errors.push(`Fila ${i + 1}: El campo precio no es numérico.`);
@@ -83,19 +153,19 @@ export function validateRows(rawRows: any[]): { success: boolean, data?: CopperR
     const date = formatDate(findValue(row, DATE_ALIASES), parsedRows.length);
 
     const rawGrowth = findValue(row, GROWTH_ALIASES);
-    const globalGrowth = isEmpty(rawGrowth) ? 2.5 : parseFloat(String(rawGrowth));
+    const globalGrowth = isEmpty(rawGrowth) ? 2.5 : parseLocaleNumber(String(rawGrowth));
 
     const rawUsd = findValue(row, USD_ALIASES);
-    const usdIndex = isEmpty(rawUsd) ? 100 : parseFloat(String(rawUsd));
+    const usdIndex = isEmpty(rawUsd) ? 100 : parseLocaleNumber(String(rawUsd));
 
     const rawStocks = findValue(row, STOCKS_ALIASES);
-    const stocks = isEmpty(rawStocks) ? 4 : parseFloat(String(rawStocks));
+    const stocks = isEmpty(rawStocks) ? 4 : parseLocaleNumber(String(rawStocks));
 
     const rawLibor = findValue(row, LIBOR_ALIASES);
-    const libor = isEmpty(rawLibor) ? 100 : parseFloat(String(rawLibor));
+    const libor = isEmpty(rawLibor) ? 100 : parseLocaleNumber(String(rawLibor));
 
     const rawPartLargas = findValue(row, PART_LARGAS_ALIASES);
-    const partLargas = isEmpty(rawPartLargas) ? 0.7 : parseFloat(String(rawPartLargas));
+    const partLargas = isEmpty(rawPartLargas) ? 0.7 : parseLocaleNumber(String(rawPartLargas));
 
     parsedRows.push({
       date,
@@ -126,12 +196,18 @@ export async function parseFile(file: File): Promise<ParseResult> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const fieldSeparator = sniffCsvFieldSeparator(data);
+        const workbook = XLSX.read(data, { type: 'array', ...(fieldSeparator ? { FS: fieldSeparator } : {}) });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Convert to JSON
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: null }) as any[];
+
+        // Convert to JSON. raw:false devuelve el texto formateado de cada
+        // celda en vez del valor JS auto-coercido: sin esto, SheetJS asume
+        // que la coma es separador de miles y "4,23" se convierte en el
+        // número 423 antes de llegar a parseLocaleNumber (verificado contra
+        // el Excel del curso: no afecta la columna de fecha ni el precio,
+        // sólo evita la coerción prematura de comas decimales).
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: null, raw: false }) as any[];
         
         const validation = validateRows(rawRows);
         resolve(validation);
