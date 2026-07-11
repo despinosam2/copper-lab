@@ -39,6 +39,23 @@ describe("validateRows — casos válidos", () => {
   });
 });
 
+describe("validateRows — R05: techo de filas", () => {
+  it("rechaza un archivo con más de 2000 filas", () => {
+    const rows = Array(2001).fill(0).map((_, i) => ({ price: 4 + i * 0.001 }));
+    const res = validateRows(rows);
+    expect(res.success).toBe(false);
+    expect(res.errors![0]).toContain("2001 filas");
+    expect(res.errors![0]).toContain("2000");
+  });
+
+  it("acepta un archivo con exactamente 2000 filas", () => {
+    const rows = Array(2000).fill(0).map((_, i) => ({ price: 4 + i * 0.001 }));
+    const res = validateRows(rows);
+    expect(res.success).toBe(true);
+    expect(res.data).toHaveLength(2000);
+  });
+});
+
 describe("validateRows — R03: detectedColumns", () => {
   it("marca en false las columnas que no existen en el archivo", () => {
     const res = validateRows([{ price: 5 }]);
