@@ -146,7 +146,10 @@ export function gprForecast(
 ): ForecastResult {
   const n = y.length;
   if (trainEnd < 3) return { fitted: nulls(n) };
-  const denom = Math.max(trainEnd - 1, 1);
+  // R09: normalizar por (n-1), no (trainEnd-1) — así el mismo l de la
+  // pestaña 04 significa la misma suavidad sin importar el % de
+  // entrenamiento elegido en la 07 (antes diferían hasta 10.5% en RMSE).
+  const denom = Math.max(n - 1, 1);
   const xAll = Array(n).fill(0).map((_, i) => i / denom);
   const { mean, variance } = gprPredict(xAll.slice(0, trainEnd), y.slice(0, trainEnd), xAll, params);
   const fitted = mean.map(v => v as number | null);
@@ -170,7 +173,8 @@ export function gprOneStepForecast(
 ): ForecastResult {
   const n = y.length;
   if (trainEnd < 3) return { fitted: nulls(n) };
-  const denom = Math.max(trainEnd - 1, 1);
+  // R09: mismo criterio que gprForecast — normalizar por (n-1).
+  const denom = Math.max(n - 1, 1);
   const xOf = (i: number) => i / denom;
 
   const fitted = nulls(n);
@@ -223,7 +227,8 @@ export function hybridForecast(
     const f = base.fitted[i];
     return f === null ? 0 : v - f;
   });
-  const denom = Math.max(trainEnd - 1, 1);
+  // R09: mismo criterio que gprForecast/gprOneStepForecast.
+  const denom = Math.max(n - 1, 1);
   const xAll = Array(n).fill(0).map((_, i) => i / denom);
   const g = gprPredict(xAll.slice(0, trainEnd), residuals.slice(0, trainEnd), xAll, gprParams);
 
