@@ -63,6 +63,15 @@ export interface ValidationState {
   trainPct: number;
   model: PredictorId;
   folds: number;
+  /**
+   * Modo de pronóstico del GPR en la zona de prueba:
+   *  - 'onestep': re-entrena con ventana expansiva y predice un paso adelante
+   *    (comparable con los demás modelos — el default justo).
+   *  - 'extrapolate': un solo ajuste que extrapola multi-paso; la media
+   *    revierte hacia la media histórica y la banda se ensancha (la imagen
+   *    honesta de "aquí ya no sé", pero incomparable con los otros modelos).
+   */
+  gprMode: 'onestep' | 'extrapolate';
   /** Rezagos de precio usados como características por los modelos ML. */
   mlLags: number;
   ridgeLambda: number;
@@ -123,6 +132,7 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     trainPct: 80,
     model: 'arimax',
     folds: 4,
+    gprMode: 'onestep',
     mlLags: 3,
     ridgeLambda: 0.1,
     knnK: 5,

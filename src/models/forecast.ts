@@ -156,6 +156,51 @@ export function gprForecast(
 }
 
 /**
+ * GPR out-of-sample en modo UN PASO: para cada punto de prueba re-entrena
+ * con todos los datos anteriores (ventana expansiva) y predice sólo el punto
+ * siguiente — la actualización natural del posterior gaussiano. Es el modo
+ * comparable con ARIMA/ARIMAX/ML (que también usan la historia real), a
+ * diferencia de gprForecast, que extrapola multi-paso y revierte a la media.
+ */
+export function gprOneStepForecast(
+  y: number[],
+  params: GprParams,
+  trainEnd: number,
+  bandSigma: 1 | 2 = 2
+): ForecastResult {
+  const n = y.length;
+  if (trainEnd < 3) return { fitted: nulls(n) };
+  const denom = Math.max(trainEnd - 1, 1);
+  const xOf = (i: number) => i / denom;
+
+  const fitted = nulls(n);
+  const bandLo = nulls(n);
+  const bandHi = nulls(n);
+
+  // Tramo de entrenamiento: un solo ajuste con [0, trainEnd), como siempre.
+  const xTr = Array(trainEnd).fill(0).map((_, i) => xOf(i));
+  const base = gprPredict(xTr, y.slice(0, trainEnd), xTr, params);
+  for (let i = 0; i < trainEnd; i++) {
+    const sd = Math.sqrt(Math.max(0, base.variance[i]));
+    fitted[i] = base.mean[i];
+    bandLo[i] = Math.max(0, base.mean[i] - bandSigma * sd);
+    bandHi[i] = base.mean[i] + bandSigma * sd;
+  }
+
+  // Tramo de prueba: re-entrenar con [0, i) y predecir el punto i.
+  for (let i = trainEnd; i < n; i++) {
+    const xw = Array(i).fill(0).map((_, j) => xOf(j));
+    const g = gprPredict(xw, y.slice(0, i), [xOf(i)], params);
+    const sd = Math.sqrt(Math.max(0, g.variance[0]));
+    fitted[i] = g.mean[0];
+    bandLo[i] = Math.max(0, g.mean[0] - bandSigma * sd);
+    bandHi[i] = g.mean[0] + bandSigma * sd;
+  }
+
+  return { fitted, bandLo, bandHi };
+}
+
+/**
  * Híbrido out-of-sample: ARIMAX (un-paso con historia real) + GPR entrenado
  * sobre los residuos del tramo de entrenamiento, extrapolado a la prueba.
  * Misma construcción que la pestaña 05 (residuos con ceros en los primeros

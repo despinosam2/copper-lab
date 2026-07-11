@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { CopperRow } from '../data/generator';
 import { useModelParams, PredictorId } from '../state/ModelParams';
-import { buildExogMatrix } from '../state/exogDefs';
-import { arimaxForecast, gprForecast, hybridForecast, ForecastResult } from '../models/forecast';
+import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
+import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, ForecastResult } from '../models/forecast';
 import { buildMlDataset, ridgeForecast, knnForecast, forestForecast, ML_FEATURE_DEFS } from '../models/ml';
 import { evaluateSplit, walkForwardFolds, walkForwardRmse, testRmse } from '../models/evaluation';
 import { Panel } from '../components/Panel';
@@ -44,8 +44,12 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
           return arimaxForecast(y, [], arima.p, arima.d, cut);
         case 'arimax':
           return arimaxForecast(y, buildExogMatrix(data, arimax), arimax.p, arimax.d, cut);
-        case 'gpr':
-          return gprForecast(y, { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance }, cut, gpr.bandSigma);
+        case 'gpr': {
+          const params = { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance };
+          return v.gprMode === 'extrapolate'
+            ? gprForecast(y, params, cut, gpr.bandSigma)
+            : gprOneStepForecast(y, params, cut, gpr.bandSigma);
+        }
         case 'hybrid': {
           const exog = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
           return hybridForecast(y, exog, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, cut);
@@ -58,7 +62,7 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
           return { fitted: forestForecast(buildMlDataset(data, v.mlLags), n, cut, v.forestTrees, v.forestDepth) };
       }
     };
-  }, [y, data, n, arima, arimax, gpr, hybrid, v.mlLags, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth]);
+  }, [y, data, n, arima, arimax, gpr, hybrid, v.gprMode, v.mlLags, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth]);
 
   // ---- Ajuste principal del modelo seleccionado ----
   const { chartData, evalResult, hasBand } = useMemo(() => {
@@ -107,20 +111,26 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
     setImportance(null);
     setTimeout(async () => {
       const base = testRmse(y, runModel(v.model, trainEnd).fitted, trainEnd);
+      // La ablación debe compararse contra el MISMO conjunto base de
+      // covariables que usa el modelo: para ARIMAX, sólo las activas en su
+      // pestaña; para Híbrido y los ML, siempre las cinco.
+      const ablatable = v.model === 'arimax'
+        ? activeExogDefs(arimax).map(d => ({ key: d.key, label: d.shortLabel }))
+        : ML_FEATURE_DEFS.map(d => ({ key: d.key, label: d.label }));
       const out: { name: string; delta: number }[] = [];
-      for (const def of ML_FEATURE_DEFS) {
+      for (const def of ablatable) {
         let fitted: (number | null)[];
         if (v.model === 'ridge') fitted = ridgeForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.ridgeLambda);
         else if (v.model === 'knn') fitted = knnForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.knnK);
         else if (v.model === 'forest') fitted = forestForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.forestTrees, v.forestDepth);
-        else {
-          // ARIMAX / Híbrido: quitar la covariable de la matriz de exógenas
-          const exog = data.map(r =>
-            ML_FEATURE_DEFS.filter(f => f.key !== def.key).map(f => r[f.key])
-          );
-          fitted = v.model === 'hybrid'
-            ? hybridForecast(y, exog, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, trainEnd).fitted
-            : arimaxForecast(y, exog, arimax.p, arimax.d, trainEnd).fitted;
+        else if (v.model === 'hybrid') {
+          const exog = data.map(r => ML_FEATURE_DEFS.filter(f => f.key !== def.key).map(f => r[f.key]));
+          fitted = hybridForecast(y, exog, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, trainEnd).fitted;
+        } else {
+          // ARIMAX: conjunto activo menos la covariable ablacionada
+          const kept = activeExogDefs(arimax).filter(f => f.key !== def.key);
+          const exog = data.map(r => kept.map(f => r[f.key]));
+          fitted = arimaxForecast(y, exog, arimax.p, arimax.d, trainEnd).fitted;
         }
         const rmse = testRmse(y, fitted, trainEnd);
         if (base !== null && rmse !== null) out.push({ name: def.label, delta: rmse - base });
@@ -170,6 +180,8 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
             El corte es temporal, nunca aleatorio: barajar dejaría al modelo "viendo el futuro".
             La <strong>degradación</strong> (cuánto peor es el error en datos no vistos) es la medida honesta de un modelo
             predictivo — un RMSE bajísimo de entrenamiento con degradación enorme es la firma del sobreajuste.
+            Una degradación <strong>negativa</strong> también es posible y no es un error: significa que el tramo de prueba
+            resultó más fácil (menos volátil) que el de entrenamiento.
             Prueba: pon el GPR con escala de longitud mínima en su pestaña y mira qué pasa aquí. Para replicar el estudio
             del curso, importa el Excel en la barra de datos.
           </Note>
@@ -200,6 +212,34 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
             </div>
 
             <Slider label="% de entrenamiento" min={50} max={90} step={5} value={v.trainPct} onChange={val => set({ trainPct: val })} />
+
+            {v.model === 'gpr' && (
+              <div className="mt-4">
+                <p className="font-body text-sm text-ink-300 mb-1.5">Modo de pronóstico GPR</p>
+                <div className="flex gap-2" role="group" aria-label="Modo de pronóstico del GPR">
+                  {([['onestep', 'Un paso'], ['extrapolate', 'Extrapolación']] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      onClick={() => set({ gprMode: mode })}
+                      aria-pressed={v.gprMode === mode}
+                      className={`flex-1 px-3 py-2 rounded-[3px] border font-body text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina ${
+                        v.gprMode === mode
+                          ? 'border-patina text-patina-light bg-patina/10'
+                          : 'border-slate-700 text-ink-300 hover:text-ink-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
+                  <strong>Un paso</strong> re-entrena con cada dato nuevo — comparable con los demás modelos.{' '}
+                  <strong>Extrapolación</strong> predice todo el tramo de prueba de una vez: la media revierte a la
+                  histórica y la banda se ensancha (honesto, pero espera métricas mucho peores — no es un bug, es
+                  lo que significa extrapolar sin información).
+                </p>
+              </div>
+            )}
 
             {!isMl && (
               <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
