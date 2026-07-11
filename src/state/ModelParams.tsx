@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { GprParams } from '../models/gpr';
 
 // Estado compartido de los parámetros de cada modelo.
 //
@@ -80,6 +81,15 @@ export interface ValidationState {
   knnK: number;
   forestTrees: number;
   forestDepth: number;
+  /**
+   * R06: configuración de ARIMAX/GPR autoajustada usando SÓLO el tramo de
+   * entrenamiento de esta pestaña (a diferencia de los botones de autoajuste
+   * de las pestañas 03/04, que siempre usan la serie completa). undefined
+   * ⇒ se usa la configuración compartida de esa pestaña, como hoy. No
+   * sobreescribe arimax/gpr del contexto — evita tocar las pestañas 03/04.
+   */
+  arimaxOverride?: ArimaxState;
+  gprOverride?: GprParams;
 }
 
 interface ModelParamsState {

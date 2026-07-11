@@ -171,10 +171,17 @@ La capa de evaluación honesta. **Explicación del flujo completo:**
 **Estudiante (secuencia de la guía de estudio):** pestañas 01→07 en orden,
 una por sesión, con los experimentos de cada nota al pie.
 
-**Análisis de datos propios:** Importar CSV → pestaña 03 → "Autoajustar
-(BIC)" → pestaña 07 → "Validar los 7 modelos" → "Medir importancia". En
-cuatro clics: mejor especificación lineal, ranking predictivo honesto y qué
-variables importan.
+**Análisis de datos propios:** Importar CSV → pestaña 07 → "Autoajustar sin
+fuga (sólo entrenamiento)" → "Validar los 7 modelos" → "Medir importancia".
+
+> **Por qué no usar el "Autoajustar (BIC)" de la pestaña 03 antes de
+> validar:** ese botón ve la serie completa, incluido el tramo de prueba —
+> si luego evalúas "out-of-sample" con una configuración elegida mirando
+> esos mismos datos, el resultado está optimistamente sesgado (fuga de
+> selección). El botón de la pestaña 07 existe justo para evitar esto: sólo
+> ve `data.slice(0, trainEnd)`. Los botones de las pestañas 03/04 siguen
+> siendo útiles para explorar el ajuste in-sample (su propósito original),
+> simplemente no son el punto de partida correcto para la pestaña 07.
 
 ---
 
