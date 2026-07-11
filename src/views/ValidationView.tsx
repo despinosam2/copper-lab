@@ -171,13 +171,8 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
 
   return (
     <div className="flex flex-col gap-6">
-      {n < 25 && (
-        <div className="bg-slate-850/50 border-l-4 border-copper-light p-3 rounded-r-[3px] text-sm text-ink-300 font-body">
-          <strong>Datos insuficientes:</strong> la serie activa tiene sólo {n} observaciones. La validación
-          out-of-sample necesita al menos ~25 para dar resultados con sentido; los "—" indican tramos donde
-          no se pudo ajustar o evaluar.
-        </div>
-      )}
+      {/* R05: el aviso de "datos insuficientes" ahora vive en App.tsx,
+          visible en cualquier pestaña (antes sólo aparecía aquí). */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
           <Panel title={`Predicción out-of-sample · ${MODEL_LABELS[v.model]}`} eyebrow="VALIDACIÓN">

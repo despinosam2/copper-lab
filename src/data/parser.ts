@@ -135,9 +135,23 @@ function formatDate(rawDate: unknown, fallbackIndex: number): string {
   return String(rawDate);
 }
 
+// R05: techo superior de filas. El walk-forward del GPR (pestaña 07) es
+// síncrono y ~O(n³); verificado en la auditoría que a n=400 ya tarda 2.4s
+// congelando el navegador. 2000 es conservador (deja margen amplio sobre el
+// peor caso medido) — ver 09 EXECUTION BLUEPRINT §0-D-I para el contexto de
+// esta cifra.
+const MAX_ROWS = 2000;
+
 export function validateRows(rawRows: any[]): ParseResult {
   if (rawRows.length === 0) {
     return { success: false, errors: ['El archivo está vacío.'] };
+  }
+
+  if (rawRows.length > MAX_ROWS) {
+    return {
+      success: false,
+      errors: [`El archivo tiene ${rawRows.length} filas; el máximo soportado es ${MAX_ROWS}. Agrega los datos a una frecuencia menor (ej. mensual o trimestral) y vuelve a intentar.`]
+    };
   }
 
   const hasPriceColumn = rawRows.some(row => findValue(row, PRICE_ALIASES) !== undefined);

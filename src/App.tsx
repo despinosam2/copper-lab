@@ -178,6 +178,17 @@ export default function App() {
           );
         })()}
 
+        {/* R05: elevado desde ValidationView.tsx (donde sólo se veía en la
+            pestaña 07) — con pocos datos, las pestañas 02-05 mostraban
+            ajustes/métricas sin ningún aviso. Visible en cualquier pestaña. */}
+        {dataset.data.length < 25 && (
+          <div className="bg-slate-850/50 border-l-4 border-copper-light p-3 rounded-r-[3px] text-sm text-ink-300 font-body">
+            <strong>Datos insuficientes:</strong> la serie activa tiene sólo {dataset.data.length} observaciones.
+            Varios modelos necesitan al menos ~25 para dar resultados con sentido; los paneles pueden mostrar
+            "—" o métricas poco confiables en cualquier pestaña.
+          </div>
+        )}
+
         <div className="bg-slate-850/50 border-l-4 border-patina p-3 rounded-r-[3px] text-sm text-ink-300 font-body">
           <strong>Datos:</strong> Todo modelo depende de los datos. El ruido afecta la dificultad del problema. Sube el ruido y observa cómo se degradan las métricas.
         </div>
