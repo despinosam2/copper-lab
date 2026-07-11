@@ -74,6 +74,8 @@ export interface ValidationState {
   gprMode: 'onestep' | 'extrapolate';
   /** Rezagos de precio usados como características por los modelos ML. */
   mlLags: number;
+  /** Si true, los ML predicen Δprecio (diferenciado) y se reintegra al nivel. */
+  mlDiff: boolean;
   ridgeLambda: number;
   knnK: number;
   forestTrees: number;
@@ -134,6 +136,7 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     folds: 4,
     gprMode: 'onestep',
     mlLags: 3,
+    mlDiff: false,
     ridgeLambda: 0.1,
     knnK: 5,
     forestTrees: 50,

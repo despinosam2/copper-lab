@@ -35,25 +35,46 @@ export interface MlDataset {
  * Construye la matriz de características: [precio t−1 … t−lags, exógenas en t].
  * `excludeFeature` permite la ablación (importancia de variables) quitando
  * una covariable por nombre.
+ *
+ * Con `diff = true` el objetivo y los rezagos son Δprecio en vez del nivel:
+ * árboles y vecinos no pueden EXTRAPOLAR (nunca predicen por encima del
+ * máximo visto en entrenamiento), así que con una serie con tendencia
+ * colapsan; prediciendo el cambio y reintegrando (ver `reintegrateDeltas`)
+ * ese problema desaparece — la misma idea que la "d" de ARIMA.
  */
-export function buildMlDataset(data: CopperRow[], lags: number, excludeFeature?: string): MlDataset {
+export function buildMlDataset(data: CopperRow[], lags: number, excludeFeature?: string, diff = false): MlDataset {
   const defs = ML_FEATURE_DEFS.filter(f => f.label !== excludeFeature);
+  const prefix = diff ? 'Δprecio' : 'precio';
   const featureNames = [
-    ...Array(lags).fill(0).map((_, i) => `precio t−${i + 1}`),
+    ...Array(lags).fill(0).map((_, i) => `${prefix} t−${i + 1}`),
     ...defs.map(f => f.label)
   ];
+  // dy[i] = y_i − y_{i−1}; dy[0] no existe
+  const dy = data.map((r, i) => (i === 0 ? 0 : r.price - data[i - 1].price));
+  const start = diff ? lags + 1 : lags;
+
   const X: number[][] = [];
   const y: number[] = [];
   const origIdx: number[] = [];
-  for (let t = lags; t < data.length; t++) {
+  for (let t = start; t < data.length; t++) {
     const row: number[] = [];
-    for (let i = 1; i <= lags; i++) row.push(data[t - i].price);
+    for (let i = 1; i <= lags; i++) row.push(diff ? dy[t - i] : data[t - i].price);
     for (const f of defs) row.push(data[t][f.key]);
     X.push(row);
-    y.push(data[t].price);
+    y.push(diff ? dy[t] : data[t].price);
     origIdx.push(t);
   }
   return { X, y, origIdx, featureNames };
+}
+
+/**
+ * Reintegra predicciones de Δprecio al nivel de precio, un paso adelante con
+ * historia real: ŷ_t = y_{t−1} + Δŷ_t (igual que la reintegración de ARIMA).
+ */
+export function reintegrateDeltas(fittedDeltas: (number | null)[], prices: number[]): (number | null)[] {
+  return fittedDeltas.map((delta, j) =>
+    delta === null || j === 0 ? null : prices[j - 1] + delta
+  );
 }
 
 interface Standardizer {

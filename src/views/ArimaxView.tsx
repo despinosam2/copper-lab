@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CopperRow } from '../data/generator';
 import { useModelParams } from '../state/ModelParams';
 import { EXOG_DEFS, buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { fitArimax } from '../models/arimax';
+import { autoTuneArimaxBic } from '../models/arimaxTune';
 import { calculateMetrics } from '../models/metrics';
 import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
@@ -15,6 +16,24 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
   const { p, d } = arimax;
   const setP = (v: number) => setArimax({ ...arimax, p: v });
   const setD = (v: number) => setArimax({ ...arimax, d: v });
+
+  const [autoTuning, setAutoTuning] = useState(false);
+  const [tuneMsg, setTuneMsg] = useState<string | null>(null);
+  const handleAutoTune = () => {
+    setAutoTuning(true);
+    setTuneMsg(null);
+    setTimeout(async () => {
+      const best = await autoTuneArimaxBic(data);
+      if (best) {
+        setArimax({ ...arimax, p: best.p, d: best.d, ...best.flags });
+        const nVars = Object.values(best.flags).filter(Boolean).length;
+        setTuneMsg(`BIC mínimo: p=${best.p}, d=${best.d}, ${nVars} covariable${nVars === 1 ? '' : 's'}.`);
+      } else {
+        setTuneMsg('Datos insuficientes para comparar los 576 candidatos.');
+      }
+      setAutoTuning(false);
+    }, 0);
+  };
 
   const { chartData, metrics, coefficients, exogCoefficients, activeDefs } = useMemo(() => {
     const y = data.map(r => r.price);
@@ -79,6 +98,20 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
               </label>
             ))}
           </div>
+
+          <button
+            onClick={handleAutoTune}
+            disabled={autoTuning}
+            className="mt-6 w-full px-4 py-2 text-sm font-medium font-body bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-wait text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+          >
+            {autoTuning ? 'Calculando…' : 'Autoajustar (BIC)'}
+          </button>
+          {tuneMsg && <p className="text-patina-light text-xs mt-2 font-mono">{tuneMsg}</p>}
+          <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
+            Prueba las 576 combinaciones de p, d y covariables, y elige la de menor BIC — un criterio
+            que penaliza la complejidad. Ojo: el RMSE puro siempre "mejora" al agregar variables;
+            el BIC pregunta si la mejora justifica los parámetros extra.
+          </p>
         </Panel>
 
         <Panel title="Coeficientes" eyebrow="ANÁLISIS">

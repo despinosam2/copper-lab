@@ -1,11 +1,22 @@
 # 07 — VALIDACIÓN SPEC · Predicción out-of-sample, validación cruzada y selección de variables
 
-**Estado: IMPLEMENTADO en v2.0** (pestaña 07 · Predicción), con una extensión
-sobre el diseño original: además de los cuatro modelos del curso, la pestaña
-incluye tres modelos de ML implementados de forma transparente en
-`src/models/ml.ts` — Ridge (lineal regularizado), k-NN y bosque aleatorio
-(determinista, semilla fija) — que usan como características los rezagos del
-precio más las 5 covariables del dataset del curso.
+**Estado: IMPLEMENTADO en v2.0** (pestaña 07 · Predicción), con extensiones
+sobre el diseño original:
+
+- Tres modelos de ML transparentes en `src/models/ml.ts` — Ridge, k-NN y
+  bosque aleatorio (determinista, semilla fija) — con rezagos de precio +
+  las 5 covariables como características, y un toggle **"Diferenciar"** que
+  hace que predigan Δprecio y reintegren (árboles/vecinos no extrapolan
+  tendencias; es la d de ARIMA aplicada al ML).
+- El GPR tiene dos modos: **un paso** (re-entrena con ventana expansiva —
+  comparable con el resto, default) y **extrapolación** (revierte a la media
+  con banda que se ensancha — honesto pero incomparable).
+- Los folds del walk-forward parten del % de entrenamiento elegido en el
+  slider (no de un 60% fijo).
+- La pestaña 03 · ARIMAX ganó un botón **"Autoajustar (BIC)"**
+  (`src/models/arimaxTune.ts`): búsqueda exhaustiva de las 576 combinaciones
+  de p, d y covariables sobre muestra común, con penalización por complejidad
+  (el RMSE puro elegiría siempre el modelo más complejo).
 
 ## Objetivo pedagógico
 

@@ -36,19 +36,21 @@ export interface Fold {
 }
 
 /**
- * Folds walk-forward con origen rodante y ventana expansiva: el último 40%
- * de la serie se divide en k bloques de prueba; cada fold entrena con todo lo
- * anterior a su bloque. Nunca se entrena con datos posteriores a la prueba
- * (el k-fold barajado clásico es inválido en series de tiempo).
+ * Folds walk-forward con origen rodante y ventana expansiva: el tramo
+ * posterior a `startFrac` se divide en k bloques de prueba; cada fold entrena
+ * con todo lo anterior a su bloque. Nunca se entrena con datos posteriores a
+ * la prueba (el k-fold barajado clásico es inválido en series de tiempo).
+ * Los folds con menos de 2 observaciones de prueba se descartan.
  */
-export function walkForwardFolds(n: number, k: number): Fold[] {
-  const start = Math.floor(n * 0.6);
-  if (start < 10) return []; // dataset demasiado corto para validar
+export function walkForwardFolds(n: number, k: number, startFrac = 0.6): Fold[] {
+  const frac = Math.min(Math.max(startFrac, 0.5), 0.9);
+  const start = Math.floor(n * frac);
+  if (start < 10 || n - start < 2) return []; // dataset demasiado corto para validar
   const folds: Fold[] = [];
   for (let j = 0; j < k; j++) {
     const trainEnd = Math.round(start + ((n - start) * j) / k);
     const testEnd = Math.round(start + ((n - start) * (j + 1)) / k);
-    if (testEnd > trainEnd) folds.push({ trainEnd, testEnd });
+    if (testEnd - trainEnd >= 2) folds.push({ trainEnd, testEnd });
   }
   return folds;
 }

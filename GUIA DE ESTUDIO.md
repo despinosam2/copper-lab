@@ -136,6 +136,36 @@ criterios distintos para elegir un modelo y un caso donde entren en conflicto.
 
 ---
 
+## Noche 9 (v2, opcional) — Predicción out-of-sample (pestaña 07)
+
+**Teoría:** ajuste dentro de muestra vs. predicción fuera de muestra;
+degradación; validación walk-forward (por qué el k-fold barajado es inválido
+en series de tiempo); importancia de variables por ablación; por qué árboles
+y vecinos no extrapolan tendencias.
+
+**Práctica:**
+- Importa el Excel del curso, elige ARIMAX, y mueve el % de entrenamiento:
+  ¿cómo cambia la degradación?
+- Pon el GPR con escala de longitud mínima en la pestaña 04 y ven aquí: el
+  RMSE de entrenamiento es diminuto y el de prueba explota — el sobreajuste,
+  ahora medido y no solo intuido.
+- En GPR, alterna "Un paso" y "Extrapolación": la extrapolación revierte a la
+  media histórica y da métricas mucho peores. No es un error: es lo que
+  significa predecir lejos sin información.
+- "Validar los 7 modelos": ¿el ganador in-sample (pestaña 06) sigue ganando
+  fuera de muestra? Observa también la σ entre folds (estabilidad).
+- Con Bosque aleatorio o k-NN, activa "Diferenciar (predecir Δprecio)" y
+  compara: los árboles no pueden predecir sobre el máximo que vieron; con el
+  cambio diferenciado, ese techo desaparece (la misma idea que la d de ARIMA).
+- "Medir importancia": ¿qué covariables aportan predicción real y cuáles solo
+  ajuste cosmético?
+
+**Auto-test:** ¿por qué barajar los datos antes de partir train/test sería
+trampa? ¿Qué significa una degradación negativa? ¿Por qué el mejor RMSE
+in-sample casi nunca coincide con el mejor out-of-sample?
+
+---
+
 ## Consejos transversales
 
 - **Un slider a la vez.** El valor pedagógico de la app está en aislar efectos.

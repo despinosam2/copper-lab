@@ -3,7 +3,7 @@ import { CopperRow } from '../data/generator';
 import { useModelParams, PredictorId } from '../state/ModelParams';
 import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, ForecastResult } from '../models/forecast';
-import { buildMlDataset, ridgeForecast, knnForecast, forestForecast, ML_FEATURE_DEFS } from '../models/ml';
+import { buildMlDataset, reintegrateDeltas, ridgeForecast, knnForecast, forestForecast, ML_FEATURE_DEFS } from '../models/ml';
 import { evaluateSplit, walkForwardFolds, walkForwardRmse, testRmse } from '../models/evaluation';
 import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
@@ -55,14 +55,19 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
           return hybridForecast(y, exog, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, cut);
         }
         case 'ridge':
-          return { fitted: ridgeForecast(buildMlDataset(data, v.mlLags), n, cut, v.ridgeLambda) };
         case 'knn':
-          return { fitted: knnForecast(buildMlDataset(data, v.mlLags), n, cut, v.knnK) };
-        case 'forest':
-          return { fitted: forestForecast(buildMlDataset(data, v.mlLags), n, cut, v.forestTrees, v.forestDepth) };
+        case 'forest': {
+          const ds = buildMlDataset(data, v.mlLags, undefined, v.mlDiff);
+          let fitted =
+            id === 'ridge' ? ridgeForecast(ds, n, cut, v.ridgeLambda)
+            : id === 'knn' ? knnForecast(ds, n, cut, v.knnK)
+            : forestForecast(ds, n, cut, v.forestTrees, v.forestDepth);
+          if (v.mlDiff) fitted = reintegrateDeltas(fitted, y);
+          return { fitted };
+        }
       }
     };
-  }, [y, data, n, arima, arimax, gpr, hybrid, v.gprMode, v.mlLags, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth]);
+  }, [y, data, n, arima, arimax, gpr, hybrid, v.gprMode, v.mlLags, v.mlDiff, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth]);
 
   // ---- Ajuste principal del modelo seleccionado ----
   const { chartData, evalResult, hasBand } = useMemo(() => {
@@ -88,7 +93,12 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
     setCvRunning(true);
     setCvResults(null);
     setTimeout(async () => {
-      const folds = walkForwardFolds(n, v.folds);
+      const folds = walkForwardFolds(n, v.folds, v.trainPct / 100);
+      if (folds.length === 0) {
+        setCvResults([]);
+        setCvRunning(false);
+        return;
+      }
       const out: { id: PredictorId; mean: number | null; std: number | null; perFold: (number | null)[] }[] = [];
       for (const id of ids) {
         const r = walkForwardRmse(y, folds, cut => runModel(id, cut).fitted);
@@ -120,9 +130,14 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
       const out: { name: string; delta: number }[] = [];
       for (const def of ablatable) {
         let fitted: (number | null)[];
-        if (v.model === 'ridge') fitted = ridgeForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.ridgeLambda);
-        else if (v.model === 'knn') fitted = knnForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.knnK);
-        else if (v.model === 'forest') fitted = forestForecast(buildMlDataset(data, v.mlLags, def.label), n, trainEnd, v.forestTrees, v.forestDepth);
+        if (v.model === 'ridge' || v.model === 'knn' || v.model === 'forest') {
+          const ds = buildMlDataset(data, v.mlLags, def.label, v.mlDiff);
+          fitted =
+            v.model === 'ridge' ? ridgeForecast(ds, n, trainEnd, v.ridgeLambda)
+            : v.model === 'knn' ? knnForecast(ds, n, trainEnd, v.knnK)
+            : forestForecast(ds, n, trainEnd, v.forestTrees, v.forestDepth);
+          if (v.mlDiff) fitted = reintegrateDeltas(fitted, y);
+        }
         else if (v.model === 'hybrid') {
           const exog = data.map(r => ML_FEATURE_DEFS.filter(f => f.key !== def.key).map(f => r[f.key]));
           fitted = hybridForecast(y, exog, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, trainEnd).fitted;
@@ -147,6 +162,13 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {n < 25 && (
+        <div className="bg-slate-850/50 border-l-4 border-copper-light p-3 rounded-r-[3px] text-sm text-ink-300 font-body">
+          <strong>Datos insuficientes:</strong> la serie activa tiene sólo {n} observaciones. La validación
+          out-of-sample necesita al menos ~25 para dar resultados con sentido; los "—" indican tramos donde
+          no se pudo ajustar o evaluar.
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
           <Panel title={`Predicción out-of-sample · ${MODEL_LABELS[v.model]}`} eyebrow="VALIDACIÓN">
@@ -263,6 +285,22 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
                     <Slider label="Profundidad máxima" min={2} max={8} step={1} value={v.forestDepth} onChange={val => set({ forestDepth: val })} />
                   </>
                 )}
+                <label className="mt-4 flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={v.mlDiff}
+                    onChange={e => set({ mlDiff: e.target.checked })}
+                    className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina"
+                  />
+                  <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">
+                    Diferenciar (predecir Δprecio)
+                  </span>
+                </label>
+                <p className="text-ink-500 text-xs mt-1.5 font-body leading-relaxed">
+                  Árboles y vecinos no pueden extrapolar: nunca predicen sobre el máximo visto en
+                  entrenamiento, y con una serie con tendencia colapsan. Prediciendo el <em>cambio</em> y
+                  reintegrando, ese techo desaparece — la misma idea que la "d" de ARIMA.
+                </p>
                 <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
                   Características: {v.mlLags} rezago(s) del precio + las 5 covariables del dataset del curso
                   (crecimiento, dólar, inventarios, libor, posición especulativa).
@@ -341,7 +379,12 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
           </button>
         </div>
 
-        {cvResults && (
+        {cvResults && cvResults.length === 0 && (
+          <p className="mt-4 text-sm text-ink-300 font-body">
+            Datos insuficientes para el walk-forward con este % de entrenamiento: baja el % o usa una serie más larga.
+          </p>
+        )}
+        {cvResults && cvResults.length > 0 && (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm font-body">
               <thead>
@@ -374,9 +417,10 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
         )}
 
         <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
-          Cada fold entrena con todo lo anterior a su bloque de prueba y predice el bloque siguiente (origen rodante,
-          ventana expansiva) — el k-fold barajado clásico es inválido en series de tiempo. La desviación σ entre folds
-          mide la <strong>estabilidad</strong>: un modelo que gana en un corte y pierde en otro no es un ganador confiable.
+          Los folds dividen el tramo posterior al % de entrenamiento elegido: cada uno entrena con todo lo anterior a su
+          bloque de prueba y predice el bloque siguiente (origen rodante, ventana expansiva) — el k-fold barajado clásico
+          es inválido en series de tiempo. La desviación σ entre folds mide la <strong>estabilidad</strong>: un modelo que
+          gana en un corte y pierde en otro no es un ganador confiable.
         </p>
       </Panel>
     </div>
