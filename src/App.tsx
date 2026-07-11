@@ -11,6 +11,7 @@ import { GprView } from './views/GprView';
 import { HybridView } from './views/HybridView';
 import { ComparatorView } from './views/ComparatorView';
 import { ValidationView } from './views/ValidationView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const TABS = [
   { id: '01', name: 'Estructural', component: StructuralView },
@@ -237,7 +238,9 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
-              <ActiveComponent data={dataset.data} detectedColumns={dataset.detectedColumns} />
+              <ErrorBoundary onRestoreSynthetic={dataset.clearImport}>
+                <ActiveComponent data={dataset.data} detectedColumns={dataset.detectedColumns} />
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>

@@ -9,6 +9,7 @@ import { fitHybrid } from '../models/hybrid';
 import { calculateMetrics } from '../models/metrics';
 import { Panel } from '../components/Panel';
 import { Note } from '../components/Note';
+import { fmt } from '../components/format';
 
 export function ComparatorView({ data }: { data: CopperRow[] }) {
   // Cada modelo se evalúa con la configuración que el estudiante dejó en su
@@ -67,7 +68,11 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
       }
     ];
 
-    const minRmse = Math.min(...results.map(r => r.rmse));
+    // R08: rmse puede ser null (p+d >= n en algún modelo); Math.min con un
+    // null en la mezcla daría un resultado incorrecto por coerción a 0 en
+    // JS — se filtra antes de comparar.
+    const rmseValues = results.filter((r): r is typeof r & { rmse: number } => r.rmse !== null).map(r => r.rmse);
+    const minRmse = rmseValues.length > 0 ? Math.min(...rmseValues) : null;
     return { results, minRmse };
   }, [data, arima, arimax, gpr, hybrid]);
 
@@ -88,7 +93,8 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
             </thead>
             <tbody>
               {comparison.results.map(row => {
-                const isWinner = row.rmse === comparison.minRmse;
+                // R08: nunca marcar ganador si rmse es null (datos insuficientes).
+                const isWinner = row.rmse !== null && row.rmse === comparison.minRmse;
                 return (
                   <tr key={row.name} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
                     <td className="py-4 text-ink-100 flex items-center gap-2">
@@ -96,10 +102,10 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
                       {row.name}
                     </td>
                     <td className="py-4 font-mono text-xs text-ink-300">{row.config}</td>
-                    <td className={`py-4 text-right font-mono ${isWinner ? 'text-patina font-semibold' : 'text-ink-100'}`}>{row.rmse.toFixed(3)}</td>
-                    <td className="py-4 text-right font-mono text-ink-100">{row.mae.toFixed(3)}</td>
-                    <td className="py-4 text-right font-mono text-ink-100">{row.mape.toFixed(2)}%</td>
-                    <td className="py-4 text-right font-mono text-ink-100">{row.r2.toFixed(4)}</td>
+                    <td className={`py-4 text-right font-mono ${isWinner ? 'text-patina font-semibold' : 'text-ink-100'}`}>{fmt(row.rmse)}</td>
+                    <td className="py-4 text-right font-mono text-ink-100">{fmt(row.mae)}</td>
+                    <td className="py-4 text-right font-mono text-ink-100">{row.mape === null ? '—' : `${row.mape.toFixed(2)}%`}</td>
+                    <td className="py-4 text-right font-mono text-ink-100">{fmt(row.r2, 4)}</td>
                   </tr>
                 );
               })}

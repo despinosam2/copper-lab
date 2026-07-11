@@ -9,6 +9,7 @@ import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
+import { fmt } from '../components/format';
 
 export function HybridView({ data }: { data: CopperRow[] }) {
   const { hybrid, setHybrid } = useModelParams();
@@ -54,9 +55,11 @@ export function HybridView({ data }: { data: CopperRow[] }) {
     const predHybrid = hybridModel.fitted.slice(p + d);
     const hybridMetrics = calculateMetrics(actualArimax, predHybrid);
 
-    const improvement = arimaxMetrics.rmse > 0 
-      ? ((arimaxMetrics.rmse - hybridMetrics.rmse) / arimaxMetrics.rmse) * 100 
-      : 0;
+    // R08: rmse puede ser null cuando p+d >= n (muy pocos datos); antes
+    // "mejora 0%" se confundía con "los residuos ya eran ruido".
+    const improvement = arimaxMetrics.rmse != null && hybridMetrics.rmse != null && arimaxMetrics.rmse > 0
+      ? ((arimaxMetrics.rmse - hybridMetrics.rmse) / arimaxMetrics.rmse) * 100
+      : null;
 
     return { chartData, hybridMetrics, arimaxMetrics, improvement };
   }, [data, p, d, lengthScale]);
@@ -79,10 +82,10 @@ export function HybridView({ data }: { data: CopperRow[] }) {
         </Panel>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Panel title={hybridMetrics.rmse.toFixed(3)} eyebrow="RMSE HÍBRIDO" />
-          <Panel title={arimaxMetrics.rmse.toFixed(3)} eyebrow="RMSE ARIMAX" />
-          <Panel title={`${improvement > 0 ? '+' : ''}${improvement.toFixed(1)}%`} eyebrow="MEJORA (RMSE)" />
-          <Panel title={hybridMetrics.r2.toFixed(4)} eyebrow="R² HÍBRIDO" />
+          <Panel title={fmt(hybridMetrics.rmse)} eyebrow="RMSE HÍBRIDO" />
+          <Panel title={fmt(arimaxMetrics.rmse)} eyebrow="RMSE ARIMAX" />
+          <Panel title={improvement === null ? '—' : `${improvement > 0 ? '+' : ''}${improvement.toFixed(1)}%`} eyebrow="MEJORA (RMSE)" />
+          <Panel title={fmt(hybridMetrics.r2, 4)} eyebrow="R² HÍBRIDO" />
         </div>
 
         <Note>
