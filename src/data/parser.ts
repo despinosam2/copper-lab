@@ -4,10 +4,29 @@ import { CopperRow } from './generator';
 // but the specs mention xlsx is in package.json, so we can import it directly.
 import * as XLSX from 'xlsx';
 
+/**
+ * R03: qué columnas de covariables se detectaron realmente en el archivo,
+ * a diferencia de las que se rellenaron con el valor por defecto (2.5,
+ * 100, 4, 100, 0.7) porque la columna no existía. Sin esto, un estudiante
+ * puede "activar" o "medir importancia" sobre una covariable inventada sin
+ * ninguna señal en la UI. No cubre el caso de una columna presente pero con
+ * celdas vacías sólo en algunas filas (limitación conocida, fuera de
+ * alcance de esta tarea).
+ */
+export interface DetectedColumns {
+  date: boolean;
+  globalGrowth: boolean;
+  usdIndex: boolean;
+  stocks: boolean;
+  libor: boolean;
+  partLargas: boolean;
+}
+
 export interface ParseResult {
   success: boolean;
   data?: CopperRow[];
   errors?: string[];
+  detectedColumns?: DetectedColumns;
 }
 
 // Alias de columnas reconocidas, en minúsculas y sin espacios/guiones bajos
@@ -116,7 +135,7 @@ function formatDate(rawDate: unknown, fallbackIndex: number): string {
   return String(rawDate);
 }
 
-export function validateRows(rawRows: any[]): { success: boolean, data?: CopperRow[], errors?: string[] } {
+export function validateRows(rawRows: any[]): ParseResult {
   if (rawRows.length === 0) {
     return { success: false, errors: ['El archivo está vacío.'] };
   }
@@ -125,6 +144,17 @@ export function validateRows(rawRows: any[]): { success: boolean, data?: CopperR
   if (!hasPriceColumn) {
     return { success: false, errors: ['No se encontró una columna de precio (price / precio).'] };
   }
+
+  // R03: se detecta por columna, no por fila — una columna "existe" si
+  // aparece con algún valor en al menos una fila del archivo.
+  const detectedColumns: DetectedColumns = {
+    date: rawRows.some(row => findValue(row, DATE_ALIASES) !== undefined),
+    globalGrowth: rawRows.some(row => findValue(row, GROWTH_ALIASES) !== undefined),
+    usdIndex: rawRows.some(row => findValue(row, USD_ALIASES) !== undefined),
+    stocks: rawRows.some(row => findValue(row, STOCKS_ALIASES) !== undefined),
+    libor: rawRows.some(row => findValue(row, LIBOR_ALIASES) !== undefined),
+    partLargas: rawRows.some(row => findValue(row, PART_LARGAS_ALIASES) !== undefined)
+  };
 
   const parsedRows: CopperRow[] = [];
   const errors: string[] = [];
@@ -186,7 +216,7 @@ export function validateRows(rawRows: any[]): { success: boolean, data?: CopperR
     return { success: false, errors: ['El archivo no contiene filas con precio válido.'] };
   }
 
-  return { success: true, data: parsedRows };
+  return { success: true, data: parsedRows, detectedColumns };
 }
 
 export async function parseFile(file: File): Promise<ParseResult> {
