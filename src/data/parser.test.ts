@@ -39,6 +39,40 @@ describe("validateRows — casos válidos", () => {
   });
 });
 
+describe("validateRows — R03: detectedColumns", () => {
+  it("marca en false las columnas que no existen en el archivo", () => {
+    const res = validateRows([{ price: 5 }]);
+    expect(res.success).toBe(true);
+    expect(res.detectedColumns).toEqual({
+      date: false,
+      globalGrowth: false,
+      usdIndex: false,
+      stocks: false,
+      libor: false,
+      partLargas: false
+    });
+  });
+
+  it("marca en true sólo las columnas presentes", () => {
+    const res = validateRows([{ price: 5, usd: 101, fecha: "2024-01" }]);
+    expect(res.success).toBe(true);
+    expect(res.detectedColumns).toEqual({
+      date: true,
+      globalGrowth: false,
+      usdIndex: true,
+      stocks: false,
+      libor: false,
+      partLargas: false
+    });
+  });
+
+  it("detecta una columna aunque su valor esté vacío en la primera fila", () => {
+    const res = validateRows([{ price: 5, usd: "" }, { price: 6, usd: 102 }]);
+    expect(res.success).toBe(true);
+    expect(res.detectedColumns!.usdIndex).toBe(true);
+  });
+});
+
 describe("validateRows — casos rechazados", () => {
   it("rechaza un archivo vacío", () => {
     const res = validateRows([]);

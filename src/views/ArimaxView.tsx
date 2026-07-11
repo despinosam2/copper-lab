@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CopperRow } from '../data/generator';
+import { DetectedColumns } from '../data/parser';
 import { useModelParams } from '../state/ModelParams';
 import { EXOG_DEFS, buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { fitArimax } from '../models/arimax';
@@ -11,7 +12,12 @@ import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 
-export function ArimaxView({ data }: { data: CopperRow[] }) {
+// R03: por defecto todo detectado (dataset sintético siempre trae las 6
+// columnas) — sólo difiere cuando App.tsx pasa el detectedColumns real de
+// un archivo importado con columnas ausentes.
+const ALL_DETECTED: DetectedColumns = { date: true, globalGrowth: true, usdIndex: true, stocks: true, libor: true, partLargas: true };
+
+export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: CopperRow[]; detectedColumns?: DetectedColumns }) {
   const { arimax, setArimax } = useModelParams();
   const { p, d } = arimax;
   const setP = (v: number) => setArimax({ ...arimax, p: v });
@@ -86,17 +92,24 @@ export function ArimaxView({ data }: { data: CopperRow[] }) {
           <Slider label="Diferenciación (d)" min={0} max={2} step={1} value={d} onChange={setD} />
           
           <div className="mt-6 flex flex-col gap-3">
-            {EXOG_DEFS.map(def => (
-              <label key={def.flag} className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={arimax[def.flag]}
-                  onChange={e => setArimax({ ...arimax, [def.flag]: e.target.checked })}
-                  className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina"
-                />
-                <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">{def.label}</span>
-              </label>
-            ))}
+            {EXOG_DEFS.map(def => {
+              const isDetected = detectedColumns[def.key];
+              return (
+                <label key={def.flag} className={`flex items-center gap-2 group ${isDetected ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <input
+                    type="checkbox"
+                    checked={arimax[def.flag]}
+                    disabled={!isDetected}
+                    onChange={e => setArimax({ ...arimax, [def.flag]: e.target.checked })}
+                    className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina disabled:cursor-not-allowed"
+                  />
+                  <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">
+                    {def.label}
+                    {!isDetected && <span className="text-ink-500"> (sin datos — usa un valor constante)</span>}
+                  </span>
+                </label>
+              );
+            })}
           </div>
 
           <button

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, ComponentType } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDataset } from './data/useDataset';
+import { CopperRow } from './data/generator';
+import { DetectedColumns } from './data/parser';
 import { ModelParamsProvider } from './state/ModelParams';
 import { StructuralView } from './views/StructuralView';
 import { ArimaView } from './views/ArimaView';
@@ -24,7 +26,13 @@ export default function App() {
   const dataset = useDataset();
   const [activeTab, setActiveTab] = useState(0);
 
-  const ActiveComponent = TABS[activeTab].component;
+  // R03: sólo ArimaxView (y, en R03-T5, ValidationView) leen detectedColumns;
+  // las demás vistas la ignoran a runtime como cualquier prop no declarada.
+  // El cast evita tener que tocar la firma de las 5 vistas que no la usan.
+  const ActiveComponent = TABS[activeTab].component as ComponentType<{
+    data: CopperRow[];
+    detectedColumns?: DetectedColumns;
+  }>;
 
   return (
     <ModelParamsProvider>
@@ -142,6 +150,34 @@ export default function App() {
           </div>
         </div>
 
+        {/* R03: qué columnas trae el archivo importado vs. cuáles se rellenaron
+            con un valor por defecto — para no "medir importancia" o activar
+            covariables de ARIMAX sobre una constante inventada sin saberlo. */}
+        {dataset.isImported && !dataset.errorMsg && (() => {
+          const c = dataset.detectedColumns;
+          const detected = ['precio', ...(c.date ? ['fecha'] : [])];
+          const labels: [keyof typeof c, string][] = [
+            ['globalGrowth', 'crecimiento'],
+            ['usdIndex', 'dólar'],
+            ['stocks', 'inventarios'],
+            ['libor', 'libor'],
+            ['partLargas', 'posición especulativa']
+          ];
+          const detectedCov = labels.filter(([key]) => c[key]).map(([, label]) => label);
+          const missingCov = labels.filter(([key]) => !c[key]).map(([, label]) => label);
+          return (
+            <div className="text-xs font-mono text-ink-500 -mt-2">
+              <span className="text-patina-light">Detectado:</span> {[...detected, ...detectedCov].join(', ')}
+              {missingCov.length > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-copper-light">Sin datos (rellenado):</span> {missingCov.join(', ')}
+                </>
+              )}
+            </div>
+          );
+        })()}
+
         <div className="bg-slate-850/50 border-l-4 border-patina p-3 rounded-r-[3px] text-sm text-ink-300 font-body">
           <strong>Datos:</strong> Todo modelo depende de los datos. El ruido afecta la dificultad del problema. Sube el ruido y observa cómo se degradan las métricas.
         </div>
@@ -190,7 +226,7 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25 }}
             >
-              <ActiveComponent data={dataset.data} />
+              <ActiveComponent data={dataset.data} detectedColumns={dataset.detectedColumns} />
             </motion.div>
           </AnimatePresence>
         </main>

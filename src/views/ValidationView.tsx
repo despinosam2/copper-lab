@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CopperRow } from '../data/generator';
+import { DetectedColumns } from '../data/parser';
 import { useModelParams, PredictorId } from '../state/ModelParams';
 import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, ForecastResult } from '../models/forecast';
@@ -26,7 +27,11 @@ const MODEL_LABELS: Record<PredictorId, string> = {
 const fmt = (v: number | null | undefined, digits = 3) =>
   v === null || v === undefined || !isFinite(v) ? '—' : v.toFixed(digits);
 
-export function ValidationView({ data }: { data: CopperRow[] }) {
+// R03: por defecto todo detectado (dataset sintético siempre trae las 6
+// columnas) — sólo difiere con un archivo importado con columnas ausentes.
+const ALL_DETECTED: DetectedColumns = { date: true, globalGrowth: true, usdIndex: true, stocks: true, libor: true, partLargas: true };
+
+export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data: CopperRow[]; detectedColumns?: DetectedColumns }) {
   const { validation, setValidation, arima, arimax, gpr, hybrid } = useModelParams();
   const v = validation;
   const set = (patch: Partial<typeof v>) => setValidation({ ...v, ...patch });
@@ -148,7 +153,11 @@ export function ValidationView({ data }: { data: CopperRow[] }) {
           fitted = arimaxForecast(y, exog, arimax.p, arimax.d, trainEnd).fitted;
         }
         const rmse = testRmse(y, fitted, trainEnd);
-        if (base !== null && rmse !== null) out.push({ name: def.label, delta: rmse - base });
+        // R03: el nombre de VISUALIZACIÓN se anota si la covariable fue
+        // rellenada por defecto; def.label en sí no se toca porque también
+        // se usa como clave de exclusión en buildMlDataset (líneas arriba).
+        const displayName = detectedColumns[def.key] ? def.label : `${def.label} (sin datos)`;
+        if (base !== null && rmse !== null) out.push({ name: displayName, delta: rmse - base });
         await new Promise(res => setTimeout(res, 0));
       }
       out.sort((a, b) => b.delta - a.delta);
