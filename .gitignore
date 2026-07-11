@@ -9,6 +9,10 @@ Datos Modelo*.xls
 *.pptx
 Presentation_*.pdf
 render-v4/
+PRACTICA*.xlsx
+PRACTICA*.pdf
+*KAHOOT*.xlsx
+*Kahoot*.xlsx
 ~$*
 .Rhistory
 .claude/settings.local.json

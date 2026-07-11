@@ -56,6 +56,21 @@ export interface HybridState {
   lengthScale: number;
 }
 
+export type PredictorId = 'arima' | 'arimax' | 'gpr' | 'hybrid' | 'ridge' | 'knn' | 'forest';
+
+export interface ValidationState {
+  /** % de la serie usado como entrenamiento (el resto es prueba). */
+  trainPct: number;
+  model: PredictorId;
+  folds: number;
+  /** Rezagos de precio usados como características por los modelos ML. */
+  mlLags: number;
+  ridgeLambda: number;
+  knnK: number;
+  forestTrees: number;
+  forestDepth: number;
+}
+
 interface ModelParamsState {
   structural: StructuralState;
   setStructural: (s: StructuralState) => void;
@@ -69,6 +84,8 @@ interface ModelParamsState {
   setGpr: (s: GprState) => void;
   hybrid: HybridState;
   setHybrid: (s: HybridState) => void;
+  validation: ValidationState;
+  setValidation: (s: ValidationState) => void;
 }
 
 const ModelParamsContext = createContext<ModelParamsState | null>(null);
@@ -102,10 +119,20 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
   });
   const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2 });
   const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1 });
+  const [validation, setValidation] = useState<ValidationState>({
+    trainPct: 80,
+    model: 'arimax',
+    folds: 4,
+    mlLags: 3,
+    ridgeLambda: 0.1,
+    knnK: 5,
+    forestTrees: 50,
+    forestDepth: 5
+  });
 
   return (
     <ModelParamsContext.Provider
-      value={{ structural, setStructural, dynamics, setDynamics, arima, setArima, arimax, setArimax, gpr, setGpr, hybrid, setHybrid }}
+      value={{ structural, setStructural, dynamics, setDynamics, arima, setArima, arimax, setArimax, gpr, setGpr, hybrid, setHybrid, validation, setValidation }}
     >
       {children}
     </ModelParamsContext.Provider>

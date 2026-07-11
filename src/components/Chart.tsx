@@ -9,7 +9,8 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
-  Area
+  Area,
+  ReferenceLine
 } from 'recharts';
 
 /** Redondea a 2 decimales; formatea rangos [lower, upper] como "142.38 – 198.29". */
@@ -35,9 +36,11 @@ interface ChartProps {
     color: string;
     name: string;
   };
+  /** Valor del eje X donde dibujar una línea vertical (p. ej. corte train/test). */
+  referenceX?: string;
 }
 
-export function Chart({ data, lines, area }: ChartProps) {
+export function Chart({ data, lines, area, referenceX }: ChartProps) {
   return (
     <div className="w-full h-80">
       <ResponsiveContainer width="100%" height="100%">
@@ -79,6 +82,10 @@ export function Chart({ data, lines, area }: ChartProps) {
             wrapperStyle={{ fontFamily: 'IBM Plex Mono', fontSize: 12, color: '#aab4bd', paddingTop: 8 }}
             iconType="plainline"
           />
+
+          {referenceX && (
+            <ReferenceLine x={referenceX} stroke="#79d4c2" strokeDasharray="4 4" />
+          )}
 
           {area && (
             // Área de rango nativa de Recharts: dataKey devuelve [inferior, superior]

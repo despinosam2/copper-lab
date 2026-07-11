@@ -1,9 +1,11 @@
 # 07 — VALIDACIÓN SPEC · Predicción out-of-sample, validación cruzada y selección de variables
 
-**Estado: DISEÑO — no implementado.** Extiende los documentos 01–06 con una
-séptima pestaña. No agrega un sexto modelo (el alcance de 5 modelos se
-mantiene): agrega una **capa de evaluación** sobre los cuatro modelos
-ajustables existentes.
+**Estado: IMPLEMENTADO en v2.0** (pestaña 07 · Predicción), con una extensión
+sobre el diseño original: además de los cuatro modelos del curso, la pestaña
+incluye tres modelos de ML implementados de forma transparente en
+`src/models/ml.ts` — Ridge (lineal regularizado), k-NN y bosque aleatorio
+(determinista, semilla fija) — que usan como características los rezagos del
+precio más las 5 covariables del dataset del curso.
 
 ## Objetivo pedagógico
 

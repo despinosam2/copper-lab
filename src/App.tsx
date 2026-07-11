@@ -8,6 +8,7 @@ import { ArimaxView } from './views/ArimaxView';
 import { GprView } from './views/GprView';
 import { HybridView } from './views/HybridView';
 import { ComparatorView } from './views/ComparatorView';
+import { ValidationView } from './views/ValidationView';
 
 const TABS = [
   { id: '01', name: 'Estructural', component: StructuralView },
@@ -15,7 +16,8 @@ const TABS = [
   { id: '03', name: 'ARIMAX', component: ArimaxView },
   { id: '04', name: 'GPR', component: GprView },
   { id: '05', name: 'Híbrido', component: HybridView },
-  { id: '06', name: 'Comparador', component: ComparatorView }
+  { id: '06', name: 'Comparador', component: ComparatorView },
+  { id: '07', name: 'Predicción', component: ValidationView }
 ];
 
 export default function App() {

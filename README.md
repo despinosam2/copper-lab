@@ -10,18 +10,19 @@ Cada push a `main` se despliega automáticamente a GitHub Pages (ver
 `.github/workflows/deploy.yml`). Para estudiar con la herramienta, ver
 [GUIA DE ESTUDIO.md](GUIA%20DE%20ESTUDIO.md).
 
-Las especificaciones viven en los documentos `01 PRD.md` … `06 DATA SPEC.md`.
+Las especificaciones viven en los documentos `01 PRD.md` … `07 VALIDACION SPEC.md`.
 
 ## Pantallas
 
 | # | Pantalla | Contenido |
 |---|---|---|
-| 01 | Estructural | Escenario oferta–demanda con 5 sliders y descomposición del precio |
+| 01 | Estructural | Escenario oferta–demanda + simulador dinámico (Vial/Labys) |
 | 02 | ARIMA | ARIMA(p, d, 0) por mínimos cuadrados |
 | 03 | ARIMAX | ARIMA + covariables exógenas activables |
-| 04 | GPR | Regresión de proceso gaussiano con banda ±2σ |
+| 04 | GPR | Proceso gaussiano con banda ±1σ/±2σ y autoajuste por verosimilitud marginal |
 | 05 | Híbrido | ARIMAX + GPR sobre residuos |
-| 06 | Comparador | RMSE / MAE / MAPE de los cuatro modelos ajustables |
+| 06 | Comparador | RMSE / MAE / MAPE / R² de los cuatro modelos ajustables (in-sample) |
+| 07 | Predicción **(v2)** | Validación out-of-sample: división train/test, walk-forward, importancia de variables por ablación, y modelos ML (Ridge, k-NN, bosque aleatorio) |
 
 La barra superior controla el dataset: semilla y ruido del generador sintético
 (96 meses, determinista) o importación de un CSV/Excel propio con columna
