@@ -6,6 +6,8 @@ import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
 import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, ForecastResult } from '../models/forecast';
 import { buildMlDataset, reintegrateDeltas, ridgeForecast, knnForecast, forestForecast, ML_FEATURE_DEFS } from '../models/ml';
 import { evaluateSplit, walkForwardFolds, walkForwardRmse, testRmse } from '../models/evaluation';
+import { autoTuneArimaxBic } from '../models/arimaxTune';
+import { autoTuneGpr } from '../models/gpr';
 import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
@@ -47,13 +49,18 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
       switch (id) {
         case 'arima':
           return arimaxForecast(y, [], arima.p, arima.d, cut);
-        case 'arimax':
-          return arimaxForecast(y, buildExogMatrix(data, arimax), arimax.p, arimax.d, cut);
+        case 'arimax': {
+          // R06: si hay un autoajuste sin fuga (sólo entrenamiento), se usa
+          // en vez de la configuración compartida de la pestaña 03.
+          const cfg = v.arimaxOverride ?? arimax;
+          return arimaxForecast(y, buildExogMatrix(data, cfg), cfg.p, cfg.d, cut);
+        }
         case 'gpr': {
-          const params = { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance };
+          // R06: idem para el GPR sin fuga (pestaña 04 si no hay override).
+          const cfg = v.gprOverride ?? { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance };
           return v.gprMode === 'extrapolate'
-            ? gprForecast(y, params, cut, gpr.bandSigma)
-            : gprOneStepForecast(y, params, cut, gpr.bandSigma);
+            ? gprForecast(y, cfg, cut, gpr.bandSigma)
+            : gprOneStepForecast(y, cfg, cut, gpr.bandSigma);
         }
         case 'hybrid': {
           const exog = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
@@ -72,7 +79,54 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
         }
       }
     };
-  }, [y, data, n, arima, arimax, gpr, hybrid, v.gprMode, v.mlLags, v.mlDiff, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth]);
+  }, [y, data, n, arima, arimax, gpr, hybrid, v.gprMode, v.mlLags, v.mlDiff, v.ridgeLambda, v.knnK, v.forestTrees, v.forestDepth, v.arimaxOverride, v.gprOverride]);
+
+  // ---- R06: autoajuste SIN FUGA (sólo con el tramo de entrenamiento) ----
+  // A diferencia de los botones de "Autoajustar" de las pestañas 03/04 (que
+  // siempre ven la serie completa — la fuga de selección que motivó esta
+  // recomendación), estos re-ajustan usando sólo data.slice(0, trainEnd) y
+  // escriben en v.arimaxOverride/v.gprOverride, no en arimax/gpr del
+  // contexto — las pestañas 03/04 no se ven afectadas por este botón.
+  const [noLeakTuning, setNoLeakTuning] = useState(false);
+  const [noLeakMsg, setNoLeakMsg] = useState<string | null>(null);
+
+  const handleNoLeakArimaxTune = () => {
+    setNoLeakTuning(true);
+    setNoLeakMsg(null);
+    setTimeout(async () => {
+      const best = await autoTuneArimaxBic(data.slice(0, trainEnd));
+      if (best) {
+        set({ arimaxOverride: { p: best.p, d: best.d, ...best.flags } });
+        const nVars = Object.values(best.flags).filter(Boolean).length;
+        setNoLeakMsg(`BIC mínimo (sólo entrenamiento): p=${best.p}, d=${best.d}, ${nVars} covariable${nVars === 1 ? '' : 's'}.`);
+      } else {
+        setNoLeakMsg('Datos insuficientes en el tramo de entrenamiento para comparar los 576 candidatos.');
+      }
+      setNoLeakTuning(false);
+    }, 0);
+  };
+
+  const GPR_NO_LEAK_BOUNDS = {
+    lengthScale: [0.01, 0.5] as [number, number],
+    signalVariance: [0.1, 5.0] as [number, number],
+    noiseVariance: [0.001, 0.5] as [number, number]
+  };
+
+  const handleNoLeakGprTune = () => {
+    setNoLeakTuning(true);
+    setNoLeakMsg(null);
+    setTimeout(async () => {
+      // Mismo criterio de normalización que forecast.ts tras R09: x = i/(n-1)
+      // con n = largo de la serie COMPLETA, no del tramo de entrenamiento.
+      const denom = Math.max(n - 1, 1);
+      const xTrain = Array(trainEnd).fill(0).map((_, i) => i / denom);
+      const yTrain = y.slice(0, trainEnd);
+      const best = await autoTuneGpr(xTrain, yTrain, GPR_NO_LEAK_BOUNDS);
+      set({ gprOverride: best });
+      setNoLeakMsg(`l=${best.lengthScale.toFixed(3)} · σf²=${best.signalVariance.toFixed(2)} · σn²=${best.noiseVariance.toFixed(3)} (sólo entrenamiento).`);
+      setNoLeakTuning(false);
+    }, 0);
+  };
 
   // ---- Ajuste principal del modelo seleccionado ----
   const { chartData, evalResult, hasBand } = useMemo(() => {
@@ -272,6 +326,35 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
                 Los modelos del curso usan la configuración que dejaste en su propia pestaña (p, d, covariables,
                 hiperparámetros) — igual que el Comparador.
               </p>
+            )}
+
+            {/* R06: autoajuste SIN FUGA — sólo ve el tramo de entrenamiento,
+                a diferencia de los botones de las pestañas 03/04. */}
+            {(v.model === 'arimax' || v.model === 'gpr') && (
+              <div className="mt-4 pt-4 border-t border-slate-700">
+                <button
+                  onClick={v.model === 'arimax' ? handleNoLeakArimaxTune : handleNoLeakGprTune}
+                  disabled={noLeakTuning}
+                  className="w-full px-4 py-2 text-sm font-medium font-body bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-wait text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+                >
+                  {noLeakTuning ? 'Calculando…' : 'Autoajustar sin fuga (sólo entrenamiento)'}
+                </button>
+                {noLeakMsg && <p className="text-patina-light text-xs mt-2 font-mono">{noLeakMsg}</p>}
+                {((v.model === 'arimax' && v.arimaxOverride) || (v.model === 'gpr' && v.gprOverride)) && (
+                  <button
+                    onClick={() => set(v.model === 'arimax' ? { arimaxOverride: undefined } : { gprOverride: undefined })}
+                    className="mt-2 text-xs font-body text-ink-500 hover:text-ink-300 underline"
+                  >
+                    Usar la configuración de la pestaña {v.model === 'arimax' ? '03' : '04'} en vez de esta
+                  </button>
+                )}
+                <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
+                  A diferencia del botón "Autoajustar" de la pestaña {v.model === 'arimax' ? '03' : '04'} (que ve
+                  toda la serie), este re-ajusta usando <strong>sólo</strong> los datos de entrenamiento — el
+                  tramo de prueba nunca influye en la elección de la configuración. Es la forma honesta de
+                  autoajustar cuando el objetivo es evaluar out-of-sample.
+                </p>
+              </div>
             )}
 
             {isMl && (
