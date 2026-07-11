@@ -309,6 +309,11 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
                   Características: {v.mlLags} rezago(s) del precio + las 5 covariables del dataset del curso
                   (crecimiento, dólar, inventarios, libor, posición especulativa).
                 </p>
+                <p className="text-copper-light text-xs mt-3 font-body leading-relaxed">
+                  <strong>Ojo:</strong> si mueves estos controles mirando el RMSE de <strong>prueba</strong> hasta
+                  que baje, el conjunto de prueba deja de ser una prueba honesta — es sobreajuste manual al test,
+                  el mismo vicio que esta pestaña existe para enseñar a evitar.
+                </p>
               </div>
             )}
           </Panel>
