@@ -11,6 +11,8 @@ Cada push a `main` se despliega automáticamente a GitHub Pages (ver
 [GUIA DE ESTUDIO.md](GUIA%20DE%20ESTUDIO.md).
 
 Las especificaciones viven en los documentos `01 PRD.md` … `07 VALIDACION SPEC.md`.
+El **manual de usuario y referencia técnica** (con la matemática de cada
+modelo y guía de resolución de problemas) es [08 MANUAL.md](08%20MANUAL.md).
 
 ## Pantallas
 
