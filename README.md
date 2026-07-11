@@ -45,3 +45,9 @@ funciona en GitHub Pages bajo cualquier subruta, o abriéndolo directamente.
 ## Stack
 
 React · TypeScript · Vite · TailwindCSS · Recharts · Framer Motion · SheetJS
+
+## Licencia
+
+El código está bajo licencia [MIT](LICENSE). Los datos y materiales del curso
+(Excel, presentaciones) no están cubiertos por esta licencia y no se
+distribuyen en este repositorio.
