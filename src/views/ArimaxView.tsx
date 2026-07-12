@@ -13,6 +13,7 @@ import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { ResidualsPanel } from '../components/ResidualsPanel';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 import { standardErrors, tStatistics } from '../models/diagnostics';
 
 // R03: por defecto todo detectado (dataset sintético siempre trae las 6
@@ -111,6 +112,16 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
         <Note>
           ARIMAX añade covariables al modelo base. Apaga todas las covariables (debería verse idéntico a ARIMA). Luego enciéndelas y observa el cambio en el error para evaluar si aportan información.
         </Note>
+
+        <DownloadCsvButton
+          filename={`arimax_p${p}_d${d}.csv`}
+          rows={chartData.map((row, i) => ({
+            fecha: row.date,
+            observado: row.Actual,
+            modelo: row.Model,
+            ...(i === 0 ? { rmse: metrics.rmse, mae: metrics.mae, mape: metrics.mape, r2: metrics.r2 } : {})
+          }))}
+        />
 
         <ResidualsPanel residuals={residuals} />
       </div>

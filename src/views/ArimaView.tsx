@@ -10,6 +10,7 @@ import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { ResidualsPanel } from '../components/ResidualsPanel';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 
 export function ArimaView({ data }: { data: CopperRow[] }) {
   const { arima, setArima } = useModelParams();
@@ -61,6 +62,18 @@ export function ArimaView({ data }: { data: CopperRow[] }) {
         <Note>
           El modelo ARIMA ajusta la serie usando sólo su propio pasado. Experimenta fijando p=2 y comparando d=0 vs d=1; observa cómo diferenciar mejora el ajuste de una serie con tendencia.
         </Note>
+
+        {/* R18: serie graficada + métricas (sólo en la primera fila, para
+            mantener una única tabla CSV). */}
+        <DownloadCsvButton
+          filename={`arima_p${p}_d${d}.csv`}
+          rows={chartData.map((row, i) => ({
+            fecha: row.date,
+            observado: row.Actual,
+            modelo: row.Model,
+            ...(i === 0 ? { rmse: metrics.rmse, mae: metrics.mae, mape: metrics.mape, r2: metrics.r2 } : {})
+          }))}
+        />
 
         <ResidualsPanel residuals={residuals} />
       </div>
