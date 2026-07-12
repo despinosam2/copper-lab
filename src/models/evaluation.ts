@@ -65,21 +65,35 @@ export interface WalkForwardResult {
   std: number | null;
 }
 
-/** RMSE de prueba por fold + media ± desviación estándar. */
-export function walkForwardRmse(
+/**
+ * RMSE de prueba por fold + media ± desviación estándar.
+ *
+ * R13: async, cede el hilo DESPUÉS de cada fold (antes sólo se cedía entre
+ * modelos, en runWalkForward de ValidationView.tsx — con varios folds caros
+ * en un mismo modelo, esa granularidad no bastaba). Sigue sin ceder DENTRO
+ * de un solo fold: eso requeriría que `run` (gprOneStepForecast en modo un
+ * paso) fuera async y cediera en su propio bucle interno de refits — un
+ * cambio de mayor alcance que tocaría la firma síncrona que runModel
+ * comparte con el render principal del gráfico. Decisión de alcance
+ * explícita para esta recomendación: mejora real y de bajo riesgo ahora,
+ * no un refactor mayor sin verificación exhaustiva.
+ */
+export async function walkForwardRmse(
   y: number[],
   folds: Fold[],
   run: (trainEnd: number) => (number | null)[]
-): WalkForwardResult {
-  const perFold: (number | null)[] = folds.map(({ trainEnd, testEnd }) => {
+): Promise<WalkForwardResult> {
+  const perFold: (number | null)[] = [];
+  for (const { trainEnd, testEnd } of folds) {
     const fitted = run(trainEnd);
     const a: number[] = [], p: number[] = [];
     for (let i = trainEnd; i < testEnd; i++) {
       const f = fitted[i];
       if (f !== null && isFinite(f)) { a.push(y[i]); p.push(f); }
     }
-    return a.length > 0 ? calculateMetrics(a, p).rmse : null;
-  });
+    perFold.push(a.length > 0 ? calculateMetrics(a, p).rmse : null);
+    await new Promise(resolve => setTimeout(resolve, 0)); // ceder el hilo entre folds
+  }
   const valid = perFold.filter((v): v is number => v !== null);
   if (valid.length === 0) return { perFold, mean: null, std: null };
   const mean = valid.reduce((s, v) => s + v, 0) / valid.length;

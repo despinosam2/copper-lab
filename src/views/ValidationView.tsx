@@ -158,7 +158,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
       }
       const out: { id: PredictorId; mean: number | null; std: number | null; perFold: (number | null)[] }[] = [];
       for (const id of ids) {
-        const r = walkForwardRmse(y, folds, cut => runModel(id, cut).fitted);
+        const r = await walkForwardRmse(y, folds, cut => runModel(id, cut).fitted);
         out.push({ id, ...r });
         await new Promise(res => setTimeout(res, 0)); // ceder el hilo entre modelos
       }
