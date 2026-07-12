@@ -1,5 +1,12 @@
 # 02 — SRS · Especificación de Requisitos de Software
 
+> **Enmienda v2 (jul 2026):** la restricción "Exactamente cinco modelos; el
+> alcance no se amplía" (al final de este documento) corresponde a la v1. La
+> v2 amplió el alcance a 7 pestañas y 3 modelos ML adicionales — ver
+> [`07 VALIDACION SPEC.md`](07%20VALIDACION%20SPEC.md) y
+> [`08 MANUAL.md`](08%20MANUAL.md). Los requisitos no funcionales (RNF-1 a
+> RNF-8) siguen vigentes para toda la app, incluida la v2.
+
 ## Requisitos funcionales
 
 | ID | Requisito |

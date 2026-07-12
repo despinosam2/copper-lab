@@ -1,5 +1,11 @@
 # 05 — UI SPEC · Sistema visual "instrumento científico"
 
+> **Enmienda v2 (jul 2026):** la referencia a "pestañas numeradas (01–06)"
+> más abajo corresponde a la v1. La v2 agregó la pestaña 07 (Predicción) —
+> ver [`07 VALIDACION SPEC.md`](07%20VALIDACION%20SPEC.md) — con el mismo
+> sistema visual descrito en este documento, sin cambios de paleta,
+> tipografía ni componentes.
+
 ## Concepto
 
 COPPER LAB debe verse como un **instrumento de laboratorio**, no como una app
