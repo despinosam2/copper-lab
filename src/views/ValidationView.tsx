@@ -13,6 +13,7 @@ import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
@@ -296,6 +297,24 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
             Prueba: pon el GPR con escala de longitud mínima en su pestaña y mira qué pasa aquí. Para replicar el estudio
             del curso, importa el Excel en la barra de datos.
           </Note>
+
+          {/* R18: serie graficada (entrenamiento/prueba) + métricas del split
+              en la primera fila. */}
+          <DownloadCsvButton
+            filename={`prediccion_${v.model}_${v.trainPct}pct.csv`}
+            rows={chartData.map((row, i) => ({
+              fecha: row.date,
+              observado: row.Observado,
+              ajuste_entrenamiento: row.Entrenamiento,
+              prediccion_prueba: row.Prueba,
+              ...(i === 0 ? {
+                rmse_entrenamiento: evalResult.train?.rmse ?? null,
+                rmse_prueba: evalResult.test?.rmse ?? null,
+                degradacion_pct: evalResult.degradationPct,
+                r2_prueba: evalResult.test?.r2 ?? null
+              } : {})
+            }))}
+          />
         </div>
 
         <div className="col-span-1 flex flex-col gap-6">
@@ -545,6 +564,18 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
                 ))}
               </tbody>
             </table>
+            <div className="mt-3">
+              <DownloadCsvButton
+                filename="walkforward_ranking.csv"
+                rows={cvResults.map(r => ({
+                  modelo: MODEL_LABELS[r.id],
+                  configuracion: r.config,
+                  ...Object.fromEntries(r.perFold.map((f, i) => [`fold_${i + 1}`, f])),
+                  rmse_medio: r.mean,
+                  desviacion: r.std
+                }))}
+              />
+            </div>
           </div>
         )}
 

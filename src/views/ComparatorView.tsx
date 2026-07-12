@@ -10,6 +10,7 @@ import { calculateMetrics } from '../models/metrics';
 import { Panel } from '../components/Panel';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 
 export function ComparatorView({ data }: { data: CopperRow[] }) {
   // Cada modelo se evalúa con la configuración que el estudiante dejó en su
@@ -122,6 +123,19 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
           el mayor p+d entre los comparados) — así ningún modelo gana por evaluarse en menos puntos, el mismo
           criterio que usa el autoajuste por BIC.
         </p>
+        <div className="mt-3">
+          <DownloadCsvButton
+            filename="comparador_modelos.csv"
+            rows={comparison.results.map(r => ({
+              modelo: r.name,
+              configuracion: r.config,
+              rmse: r.rmse,
+              mae: r.mae,
+              mape: r.mape,
+              r2: r.r2
+            }))}
+          />
+        </div>
       </Panel>
       <Note>
         Menor RMSE en el ajuste no garantiza mejor generalización. Un buen modelo debe equilibrar ajuste, interpretabilidad y honestidad sobre su incertidumbre. Observa qué pasa si cambias los datos (semilla/ruido).

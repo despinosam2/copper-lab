@@ -7,6 +7,7 @@ import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
   ComposedChart, Line, Area, CartesianGrid
@@ -162,12 +163,24 @@ Pₜ = Pₜ₋₁ + λ·(P̄·(I*/Iₜ)^φ − Pₜ₋₁)       precio (λ=0.15
 
           {/* R14: preset clicable — convierte la receta de la guía de estudio
               ("L=8, εD=0.1 → ciclo de telaraña persistente") en un botón. */}
-          <button
-            onClick={() => setDyn({ supplyLag: 8, demandElasticity: 0.1 })}
-            className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
-          >
-            Ver la telaraña (L=8, εD=0.1)
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setDyn({ supplyLag: 8, demandElasticity: 0.1 })}
+              className="px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+            >
+              Ver la telaraña (L=8, εD=0.1)
+            </button>
+            <DownloadCsvButton
+              filename="simulador_dinamico.csv"
+              rows={sim.series.map(pt => ({
+                trimestre: pt.t,
+                precio: pt.price,
+                demanda: pt.demand,
+                oferta: pt.supply,
+                inventarios: pt.inventory
+              }))}
+            />
+          </div>
 
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">

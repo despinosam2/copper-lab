@@ -10,6 +10,7 @@ import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 
 export function HybridView({ data }: { data: CopperRow[] }) {
   const { hybrid, setHybrid } = useModelParams();
@@ -94,12 +95,26 @@ export function HybridView({ data }: { data: CopperRow[] }) {
 
         {/* R14: preset clicable — l grande ⇒ el GPR de residuos no puede
             capturar estructura fina, la mejora tiende a 0%. */}
-        <button
-          onClick={() => setLengthScale(0.5)}
-          className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
-        >
-          Buscar mejora ≈ 0% (l=0.5)
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setLengthScale(0.5)}
+            className="px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+          >
+            Buscar mejora ≈ 0% (l=0.5)
+          </button>
+          <DownloadCsvButton
+            filename={`hibrido_p${p}_d${d}_l${lengthScale.toFixed(2)}.csv`}
+            rows={chartData.map((row, i) => ({
+              fecha: row.date,
+              observado: row.Actual,
+              arimax_base: row.ArimaxOnly,
+              hibrido: row.Model,
+              banda_inf: row.Lower,
+              banda_sup: row.Upper,
+              ...(i === 0 ? { rmse_hibrido: hybridMetrics.rmse, rmse_arimax: arimaxMetrics.rmse, mejora_pct: improvement, r2_hibrido: hybridMetrics.r2 } : {})
+            }))}
+          />
+        </div>
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">

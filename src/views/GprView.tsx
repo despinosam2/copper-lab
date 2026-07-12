@@ -8,6 +8,7 @@ import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { DownloadCsvButton } from '../components/DownloadCsvButton';
 
 const AUTOTUNE_BOUNDS = {
   lengthScale: [0.01, 0.5] as [number, number],
@@ -97,12 +98,25 @@ export function GprView({ data }: { data: CopperRow[] }) {
         </Note>
 
         {/* R14: preset clicable de la nota de arriba. */}
-        <button
-          onClick={() => setLengthScale(0.01)}
-          className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
-        >
-          Provocar sobreajuste (l=0.01)
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setLengthScale(0.01)}
+            className="px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+          >
+            Provocar sobreajuste (l=0.01)
+          </button>
+          <DownloadCsvButton
+            filename={`gpr_l${lengthScale.toFixed(2)}.csv`}
+            rows={chartData.map((row, i) => ({
+              fecha: row.date,
+              observado: row.Actual,
+              media: row.Model,
+              banda_inf: row.Lower,
+              banda_sup: row.Upper,
+              ...(i === 0 ? { rmse: metrics.rmse, mae: metrics.mae, mape: metrics.mape, r2: metrics.r2 } : {})
+            }))}
+          />
+        </div>
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">
