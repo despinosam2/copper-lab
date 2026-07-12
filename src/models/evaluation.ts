@@ -24,7 +24,11 @@ export function evaluateSplit(y: number[], fitted: (number | null)[], trainEnd: 
   }
   const train = trA.length > 0 ? calculateMetrics(trA, trP) : null;
   const test = teA.length > 0 ? calculateMetrics(teA, teP) : null;
-  const degradationPct = train && test && train.rmse > 0
+  // R08: train.rmse/test.rmse son number|null en el tipo, pero provablemente
+  // no-null aquí (calculateMetrics sólo devuelve null cuando el array está
+  // vacío o las longitudes no calzan, y trA.length>0/trP.length===trA.length
+  // por construcción) — la comparación != null se lo confirma a TS.
+  const degradationPct = train?.rmse != null && test?.rmse != null && train.rmse > 0
     ? ((test.rmse - train.rmse) / train.rmse) * 100
     : null;
   return { train, test, degradationPct };

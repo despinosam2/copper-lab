@@ -34,14 +34,17 @@ describe("calculateMetrics — R² cuando la serie es constante", () => {
   });
 });
 
-describe("calculateMetrics — casos degenerados (comportamiento actual, R08 los cambia)", () => {
-  it("[actual R08] array vacío devuelve ceros, no null", () => {
+describe("calculateMetrics — R08: casos degenerados devuelven null, no ceros", () => {
+  // Antes de R08 estos casos devolvían {rmse:0, mae:0, mape:0, r2:0}, que
+  // las vistas mostraban como "0.000" — indistinguible de un ajuste
+  // perfecto. R08 los cambia a null para que fmt() muestre "—".
+  it("array vacío devuelve null en los 4 campos", () => {
     const m = calculateMetrics([], []);
-    expect(m).toEqual({ rmse: 0, mae: 0, mape: 0, r2: 0 });
+    expect(m).toEqual({ rmse: null, mae: null, mape: null, r2: null });
   });
 
-  it("[actual R08] longitudes distintas devuelven ceros", () => {
+  it("longitudes distintas devuelven null en los 4 campos", () => {
     const m = calculateMetrics([1, 2], [1]);
-    expect(m).toEqual({ rmse: 0, mae: 0, mape: 0, r2: 0 });
+    expect(m).toEqual({ rmse: null, mae: null, mape: null, r2: null });
   });
 });

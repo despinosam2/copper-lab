@@ -8,6 +8,7 @@ import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
+import { fmt } from '../components/format';
 
 export function ArimaView({ data }: { data: CopperRow[] }) {
   const { arima, setArima } = useModelParams();
@@ -48,10 +49,10 @@ export function ArimaView({ data }: { data: CopperRow[] }) {
         </Panel>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Panel title={metrics.rmse.toFixed(3)} eyebrow="RMSE" />
-          <Panel title={metrics.mae.toFixed(3)} eyebrow="MAE" />
-          <Panel title={metrics.mape.toFixed(1) + '%'} eyebrow="MAPE" />
-          <Panel title={metrics.r2.toFixed(4)} eyebrow="R²" />
+          <Panel title={fmt(metrics.rmse)} eyebrow="RMSE" />
+          <Panel title={fmt(metrics.mae)} eyebrow="MAE" />
+          <Panel title={metrics.mape === null ? '—' : `${metrics.mape.toFixed(1)}%`} eyebrow="MAPE" />
+          <Panel title={fmt(metrics.r2, 4)} eyebrow="R²" />
         </div>
 
         <Note>

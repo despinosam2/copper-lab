@@ -12,6 +12,7 @@ import { Panel } from '../components/Panel';
 import { Slider } from '../components/Slider';
 import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
+import { fmt } from '../components/format';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
@@ -25,9 +26,6 @@ const MODEL_LABELS: Record<PredictorId, string> = {
   knn: 'k-NN (vecinos más cercanos)',
   forest: 'Bosque aleatorio'
 };
-
-const fmt = (v: number | null | undefined, digits = 3) =>
-  v === null || v === undefined || !isFinite(v) ? '—' : v.toFixed(digits);
 
 // R03: por defecto todo detectado (dataset sintético siempre trae las 6
 // columnas) — sólo difiere con un archivo importado con columnas ausentes.
