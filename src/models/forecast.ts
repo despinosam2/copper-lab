@@ -14,6 +14,7 @@
 
 import { ols, cholesky, forwardSolve, backwardSolve } from './matrix';
 import { difference } from './arima';
+import { fitArimax } from './arimax';
 import { GprParams, kernel } from './gpr';
 
 export interface ForecastResult {
@@ -250,4 +251,192 @@ export function hybridForecast(
     bandHi[i] = mu + bandSigma * sd;
   }
   return { fitted, bandLo, bandHi };
+}
+
+// ============================================================ R24 ==========
+// Pronóstico REAL a futuro (más allá del último dato observado). A diferencia
+// de todo lo anterior de este archivo — evaluación retrospectiva con historia
+// real — aquí no hay historia: ARIMA/ARIMAX/Híbrido deben alimentarse de sus
+// PROPIAS predicciones (pronóstico recursivo), el modo que la spec 07 declaró
+// "fuera de alcance" por riesgo de divergencia cerca de raíz unitaria. Ese
+// riesgo ya no es evitable; la mitigación es el mismo patrón de cortacircuito
+// numérico de structuralDynamic.ts: si una predicción sale del rango de
+// confianza (máx/mín histórico ± 3× el rango), se trunca y se marca. Las
+// exógenas futuras las provee el llamador (escenario del usuario) —
+// pronóstico CONDICIONAL, igual que el resto de la app.
+
+export interface AheadResult {
+  /** h valores futuros (paso 1 = primer período después del último dato). */
+  mean: number[];
+  /** true donde la predicción recursiva excedió el rango de confianza y fue truncada. */
+  outOfConfidence: boolean[];
+  bandLo?: number[];
+  bandHi?: number[];
+}
+
+/** Límites del cortacircuito: máx/mín histórico ± 3× el rango histórico (piso en 0: precios). */
+function confidenceBounds(y: number[]): { lo: number; hi: number } {
+  const max = Math.max(...y);
+  const min = Math.min(...y);
+  const range = Math.max(max - min, 1e-9);
+  return { lo: Math.max(0, min - 3 * range), hi: max + 3 * range };
+}
+
+/**
+ * ARIMA(p,d,0)/ARIMAX h pasos adelante, recursivo. Los coeficientes se
+ * estiman con TODO el histórico (fitArimax); las exógenas futuras vienen en
+ * futureExog (h filas — el escenario del usuario). Con exog = [] es ARIMA.
+ * Devuelve null si el modelo no puede estimarse (muy pocos datos).
+ */
+export function arimaxForecastAhead(
+  y: number[],
+  exog: number[][],
+  p: number,
+  d: number,
+  h: number,
+  futureExog: number[][],
+  diffExog = false
+): AheadResult | null {
+  const n = y.length;
+  if (n <= p + d + 2 || h <= 0) return h <= 0 ? { mean: [], outOfConfidence: [] } : null;
+  const numExog = exog.length > 0 ? exog[0].length : 0;
+
+  const model = fitArimax(y, exog, p, d, diffExog);
+  if (model.coefficients.length !== p) return null;
+
+  // Exógenas futuras en el espacio correcto: serie extendida (histórico +
+  // futuro) diferenciada d veces cuando diffExog — los últimos h valores son
+  // los Δᵈx futuros, alineados con los Δᵈy que se van a predecir.
+  const futureExogEff: number[][] = Array(h).fill(0).map(() => Array(numExog).fill(0));
+  for (let k = 0; k < numExog; k++) {
+    const histCol = exog.map(r => r[k]);
+    const futCol = futureExog.map(r => r[k]);
+    if (diffExog && d > 0) {
+      const diffedExt = difference([...histCol, ...futCol], d);
+      for (let s = 0; s < h; s++) futureExogEff[s][k] = diffedExt[diffedExt.length - h + s];
+    } else {
+      for (let s = 0; s < h; s++) futureExogEff[s][k] = futCol[s];
+    }
+  }
+
+  // Recursión en el espacio diferenciado, con historial que crece con las
+  // propias predicciones.
+  const diffHist = difference(y, d); // largo n − d
+  const { lo, hi } = confidenceBounds(y);
+
+  const mean: number[] = [];
+  const outOfConfidence: boolean[] = [];
+  // Estado de reintegración: nivel previo y (para d=2) primera diferencia previa.
+  let prevLevel = y[n - 1];
+  let prevDiff1 = d === 2 ? y[n - 1] - y[n - 2] : 0;
+
+  for (let s = 0; s < h; s++) {
+    let predDiff = model.intercept;
+    for (let i = 1; i <= p; i++) {
+      predDiff += model.coefficients[i - 1] * diffHist[diffHist.length - i];
+    }
+    for (let k = 0; k < numExog; k++) {
+      predDiff += model.exogCoefficients[k] * futureExogEff[s][k];
+    }
+    diffHist.push(predDiff);
+
+    let level: number;
+    if (d === 0) level = predDiff;
+    else if (d === 1) level = prevLevel + predDiff;
+    else {
+      prevDiff1 = prevDiff1 + predDiff; // Δ¹ acumula Δ²
+      level = prevLevel + prevDiff1;
+    }
+
+    // Cortacircuito: truncar y marcar. La recursión continúa desde el valor
+    // truncado (eso es lo que la mantiene acotada — mismo principio que el
+    // cortacircuito de precio del simulador dinámico).
+    const truncated = level < lo || level > hi;
+    if (truncated) {
+      level = Math.min(Math.max(level, lo), hi);
+      // Corregir también el estado de recursión al espacio truncado, para
+      // que los pasos siguientes partan del valor acotado, no del desbocado.
+      if (d === 1) diffHist[diffHist.length - 1] = level - prevLevel;
+      else if (d === 2) {
+        prevDiff1 = level - prevLevel;
+      }
+    }
+    mean.push(level);
+    outOfConfidence.push(truncated);
+    prevLevel = level;
+  }
+
+  return { mean, outOfConfidence };
+}
+
+/**
+ * GPR h pasos adelante: extrapolación pura del posterior (sin recursión —
+ * el GP predice en cualquier x). La media revierte a la histórica y la banda
+ * se ensancha: el modelo declarando "aquí ya no sé". x futuro sigue la misma
+ * normalización i/(n−1) del resto de la app.
+ */
+export function gprForecastAhead(
+  y: number[],
+  params: GprParams,
+  h: number,
+  bandSigma: 1 | 2 = 2
+): AheadResult | null {
+  const n = y.length;
+  if (n < 3) return null;
+  if (h <= 0) return { mean: [], outOfConfidence: [] };
+  const denom = Math.max(n - 1, 1);
+  const xTrain = Array(n).fill(0).map((_, i) => i / denom);
+  const xFuture = Array(h).fill(0).map((_, s) => (n + s) / denom);
+  const g = gprPredict(xTrain, y, xFuture, params);
+  const mean = g.mean;
+  const bandLo = mean.map((m, s) => Math.max(0, m - bandSigma * Math.sqrt(Math.max(0, g.variance[s]))));
+  const bandHi = mean.map((m, s) => m + bandSigma * Math.sqrt(Math.max(0, g.variance[s])));
+  // La extrapolación del GP es acotada por construcción (revierte a la media):
+  // no necesita cortacircuito.
+  return { mean, outOfConfidence: Array(h).fill(false), bandLo, bandHi };
+}
+
+/**
+ * Híbrido h pasos adelante: ARIMAX recursivo + GPR extrapolado sobre los
+ * residuos del ajuste completo (misma construcción que la pestaña 05).
+ */
+export function hybridForecastAhead(
+  y: number[],
+  exog: number[][],
+  p: number,
+  d: number,
+  gprParams: GprParams,
+  h: number,
+  futureExog: number[][],
+  bandSigma: 1 | 2 = 2,
+  diffExog = false
+): AheadResult | null {
+  const n = y.length;
+  const base = arimaxForecastAhead(y, exog, p, d, h, futureExog, diffExog);
+  if (base === null) return null;
+  if (h <= 0) return base;
+
+  const fit = fitArimax(y, exog, p, d, diffExog);
+  const residuals = fit.residuals.length === n ? fit.residuals : Array(n).fill(0);
+  const denom = Math.max(n - 1, 1);
+  const xTrain = Array(n).fill(0).map((_, i) => i / denom);
+  const xFuture = Array(h).fill(0).map((_, s) => (n + s) / denom);
+  const g = gprPredict(xTrain, residuals, xFuture, gprParams);
+
+  const { lo, hi } = confidenceBounds(y);
+  const mean: number[] = [];
+  const outOfConfidence: boolean[] = [];
+  const bandLo: number[] = [];
+  const bandHi: number[] = [];
+  for (let s = 0; s < h; s++) {
+    let level = base.mean[s] + g.mean[s];
+    const truncated = base.outOfConfidence[s] || level < lo || level > hi;
+    level = Math.min(Math.max(level, lo), hi);
+    const sd = Math.sqrt(Math.max(0, g.variance[s]));
+    mean.push(level);
+    outOfConfidence.push(truncated);
+    bandLo.push(Math.max(0, level - bandSigma * sd));
+    bandHi.push(level + bandSigma * sd);
+  }
+  return { mean, outOfConfidence, bandLo, bandHi };
 }

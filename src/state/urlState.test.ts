@@ -12,7 +12,7 @@ const sample: ShareableState = {
   arimax: { p: 2, d: 1, useGrowth: true, useUsd: false, useStocks: true, useLibor: false, usePartLargas: false, diffExog: true },
   gpr: { lengthScale: 0.05, signalVariance: 2.0, noiseVariance: 0.01, bandSigma: 1, kernelMode: 'rbf+periodic', periodicLengthScale: 1.5, periodicVariance: 0.4 },
   hybrid: { p: 2, d: 1, lengthScale: 0.3 },
-  validation: { trainPct: 70, model: 'forest', folds: 5, gprMode: 'extrapolate', mlLags: 4, mlDiff: true, ridgeLambda: 0.5, knnK: 7, forestTrees: 80, forestDepth: 6 },
+  validation: { trainPct: 70, model: 'forest', folds: 5, gprMode: 'extrapolate', mlLags: 4, mlDiff: true, ridgeLambda: 0.5, knnK: 7, forestTrees: 80, forestDepth: 6, forecastHorizon: 18, exogScenario: { globalGrowth: 0.5, usdIndex: -0.2, stocks: 0, libor: 0, partLargas: 0 } },
 };
 
 describe("urlState — encode/decode", () => {

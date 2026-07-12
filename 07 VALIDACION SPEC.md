@@ -175,6 +175,32 @@ jornada (el refactor es lo delicado — hay que verificar que las pestañas
 02–05 sigan dando números idénticos tras separar fit/predict); etapas 2 y 3
 son 2–3 horas cada una sobre la base de la etapa 1.
 
+## F12 · Proyección a futuro (v2.2 — R24 de la auditoría)
+
+Sección "Proyección a futuro" dentro de la misma pestaña 07 (no una pestaña
+nueva). A diferencia de todo lo anterior de este documento — evaluación
+retrospectiva con historia real — aquí **no hay historia**: es pronóstico
+**recursivo** (el modo que este mismo documento declaró "fuera de alcance"
+por riesgo de divergencia; ese riesgo ahora se mitiga con cortacircuito).
+
+**Supuestos fijados (decisión de producto, no hechos técnicos):**
+
+1. **Horizonte:** default 12 períodos, slider 1–24.
+2. **Exógenas futuras:** constantes en su último valor observado (supuesto
+   ingenuo, declarado en pantalla), ajustable con una tasa %/período por
+   covariable ("¿y si el dólar sube 1% por período?").
+3. **Escenario simple**, no un editor de series futuras (fuera de alcance).
+4. **Modelos:** ARIMA/ARIMAX/Híbrido recursivos con **cortacircuito**
+   (máx/mín histórico ± 3× el rango; el punto truncado se marca en rojo y
+   la recursión continúa desde el valor acotado — mismo principio que el
+   cortacircuito de precio del simulador dinámico). GPR extrapola sin
+   recursión (acotado por construcción: revierte a la media). Los modelos
+   de ML quedan fuera (sin mecanismo recursivo comparable).
+5. **Advertencia prominente** (no nota al pie): esto NO es una predicción
+   del precio real del cobre — es una proyección condicional al escenario,
+   y el propósito de la app es entender los modelos, no predecir el mercado
+   (PRD).
+
 ## Criterios de aceptación
 
 1. Con 100% de entrenamiento, las métricas de la pestaña 07 coinciden

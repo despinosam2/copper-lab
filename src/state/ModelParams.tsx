@@ -108,6 +108,20 @@ export interface ValidationState {
    */
   arimaxOverride?: ArimaxState;
   gprOverride?: GprParams;
+  /** R24: horizonte del pronóstico a futuro, en períodos (1–24). */
+  forecastHorizon: number;
+  /**
+   * R24: escenario de exógenas futuras — tasa de crecimiento %/período por
+   * covariable. 0 (default) = constante en su último valor observado
+   * (supuesto ingenuo, declarado en pantalla).
+   */
+  exogScenario: {
+    globalGrowth: number;
+    usdIndex: number;
+    stocks: number;
+    libor: number;
+    partLargas: number;
+  };
 }
 
 interface ModelParamsState {
@@ -189,6 +203,8 @@ export function ModelParamsProvider({ children, initial }: { children: ReactNode
     knnK: 5,
     forestTrees: 50,
     forestDepth: 5,
+    forecastHorizon: 12,
+    exogScenario: { globalGrowth: 0, usdIndex: 0, stocks: 0, libor: 0, partLargas: 0 },
     ...initial?.validation
   });
 

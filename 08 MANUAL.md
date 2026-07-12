@@ -166,6 +166,26 @@ La capa de evaluación honesta. **Explicación del flujo completo:**
    y mide cuánto empeora el RMSE **de prueba** (ablación). Barra cobre =
    aporta; barra pátina ≈ 0 = prescindible en presencia de las demás.
 
+### 2.9 Proyección a futuro (v2.2, dentro de la pestaña 07)
+
+Al final de la pestaña 07: pronóstico **recursivo** h períodos más allá del
+último dato (slider 1–24, default 12). El modelo se estima con todo el
+histórico y se alimenta de sus propias predicciones — los errores se
+acumulan paso a paso, a diferencia del resto de la pestaña (un paso adelante
+con historia real).
+
+- **Exógenas futuras** (ARIMAX/Híbrido): constantes en su último valor
+  observado por defecto; sliders de tasa %/período para explorar escenarios.
+  Es una proyección **condicional** al escenario, no una predicción de esas
+  variables.
+- **Cortacircuito:** si la recursión excede máx/mín histórico ± 3× el rango,
+  el punto se trunca y se marca en rojo — no confíes en ese tramo (riesgo
+  clásico del pronóstico recursivo cerca de raíz unitaria).
+- **GPR:** extrapola sin recursión — la media revierte a la histórica y la
+  banda se ensancha ("aquí ya no sé").
+- **Advertencia:** esto NO es una predicción del precio real del cobre; el
+  propósito de la app es entender los modelos, no predecir el mercado.
+
 ### Flujos de trabajo típicos
 
 **Estudiante (secuencia de la guía de estudio):** pestañas 01→07 en orden,

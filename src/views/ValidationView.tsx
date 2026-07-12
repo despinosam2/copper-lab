@@ -3,7 +3,7 @@ import { CopperRow } from '../data/generator';
 import { DetectedColumns } from '../data/parser';
 import { useModelParams, PredictorId } from '../state/ModelParams';
 import { buildExogMatrix, activeExogDefs } from '../state/exogDefs';
-import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, ForecastResult } from '../models/forecast';
+import { arimaxForecast, gprForecast, gprOneStepForecast, hybridForecast, arimaxForecastAhead, gprForecastAhead, hybridForecastAhead, ForecastResult, AheadResult } from '../models/forecast';
 import { buildMlDataset, reintegrateDeltas, ridgeForecast, knnForecast, forestForecast, ML_FEATURE_DEFS } from '../models/ml';
 import { evaluateSplit, walkForwardFolds, walkForwardRmse, testRmse } from '../models/evaluation';
 import { autoTuneArimaxBic } from '../models/arimaxTune';
@@ -154,6 +154,69 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
     }));
     return { chartData, evalResult, hasBand };
   }, [runModel, v.model, trainEnd, y, data]);
+
+  // ---- R24: proyección a futuro (recursiva con cortacircuito) ----
+  const isCourseModel = v.model === 'arima' || v.model === 'arimax' || v.model === 'gpr' || v.model === 'hybrid';
+  const EXOG_KEYS = ['globalGrowth', 'usdIndex', 'stocks', 'libor', 'partLargas'] as const;
+
+  const { aheadResult, aheadChartData } = useMemo((): { aheadResult: AheadResult | null; aheadChartData: any[] } => {
+    if (!isCourseModel || n < 3) return { aheadResult: null, aheadChartData: [] };
+    const h = v.forecastHorizon;
+    const lastRow = data[n - 1];
+    // Exógenas futuras: último valor observado × (1 + tasa/100)^(s+1) —
+    // supuesto ingenuo por defecto (tasa 0 = constante), declarado en pantalla.
+    const futureAll = Array(h).fill(0).map((_, s) =>
+      EXOG_KEYS.map(k => lastRow[k] * Math.pow(1 + v.exogScenario[k] / 100, s + 1))
+    );
+
+    let result: AheadResult | null = null;
+    switch (v.model) {
+      case 'arima':
+        result = arimaxForecastAhead(y, [], arima.p, arima.d, h, Array(h).fill([]));
+        break;
+      case 'arimax': {
+        const cfg = v.arimaxOverride ?? arimax;
+        const active = activeExogDefs(cfg);
+        const activeIdx = active.map(defn => EXOG_KEYS.indexOf(defn.key as typeof EXOG_KEYS[number]));
+        const futureActive = futureAll.map(row => activeIdx.map(i => row[i]));
+        result = arimaxForecastAhead(y, buildExogMatrix(data, cfg), cfg.p, cfg.d, h, futureActive, cfg.diffExog);
+        break;
+      }
+      case 'gpr': {
+        const cfg = {
+          ...(v.gprOverride ?? { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance, kernelMode: gpr.kernelMode, periodicLengthScale: gpr.periodicLengthScale, periodicVariance: gpr.periodicVariance }),
+          period: 12 / Math.max(n - 1, 1)
+        };
+        result = gprForecastAhead(y, cfg, h, gpr.bandSigma);
+        break;
+      }
+      case 'hybrid': {
+        const exog5 = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
+        result = hybridForecastAhead(y, exog5, hybrid.p, hybrid.d, { lengthScale: hybrid.lengthScale, signalVariance: 1.0, noiseVariance: 0.05 }, h, futureAll, 2);
+        break;
+      }
+    }
+    if (!result) return { aheadResult: null, aheadChartData: [] };
+
+    // Gráfico: últimos 24 puntos históricos + los h futuros ("+1", "+2"…).
+    const histTail = Math.min(24, n);
+    const rows: any[] = [];
+    for (let i = n - histTail; i < n; i++) {
+      rows.push({ date: data[i].date, Histórico: y[i], Proyección: i === n - 1 ? y[i] : null, Truncado: null, Upper: null, Lower: null });
+    }
+    for (let s = 0; s < result.mean.length; s++) {
+      rows.push({
+        date: `+${s + 1}`,
+        Histórico: null,
+        Proyección: result.mean[s],
+        Truncado: result.outOfConfidence[s] ? result.mean[s] : null,
+        Upper: result.bandHi ? result.bandHi[s] : null,
+        Lower: result.bandLo ? result.bandLo[s] : null
+      });
+    }
+    return { aheadResult: result, aheadChartData: rows };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCourseModel, n, data, y, v.model, v.forecastHorizon, v.exogScenario, v.arimaxOverride, v.gprOverride, arima, arimax, gpr, hybrid]);
 
   // R16: etiqueta de configuración por modelo — se captura en el momento de
   // correr la validación (no en vivo), para que la tabla sea trazable aunque
@@ -599,6 +662,93 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
           es inválido en series de tiempo. La desviación σ entre folds mide la <strong>estabilidad</strong>: un modelo que
           gana en un corte y pierde en otro no es un ganador confiable.
         </p>
+      </Panel>
+
+      {/* ——— R24: proyección REAL a futuro (recursiva, condicional al escenario) ——— */}
+      <Panel title="Proyección a futuro" eyebrow="PRONÓSTICO RECURSIVO">
+        {/* Advertencia PROMINENTE (criterio del blueprint: imposible de no ver,
+            no una nota al pie): recordar el propósito declarado del PRD. */}
+        <div className="bg-copper-deep/20 border-l-4 border-copper-light p-3 rounded-r-[3px] text-sm text-ink-100 font-body mb-4">
+          <strong>Esto NO es una predicción del precio real del cobre.</strong> Es una proyección{' '}
+          <em>condicional</em> a los supuestos de la derecha (exógenas siguiendo tu escenario, modelo congelado)
+          — el propósito de esta app es entender los modelos, no predecir el mercado. A diferencia del resto de
+          la pestaña, aquí el modelo se alimenta de sus <strong>propias predicciones</strong> (pronóstico
+          recursivo): los errores se acumulan paso a paso.
+        </div>
+
+        {!isCourseModel ? (
+          <p className="text-ink-500 text-sm font-body leading-relaxed">
+            La proyección a futuro está disponible para los 4 modelos del curso (ARIMA, ARIMAX, GPR, Híbrido).
+            Los modelos de ML de esta app usan rezagos observados como características y no tienen un mecanismo
+            recursivo comparable — elige un modelo del curso en el selector de arriba.
+          </p>
+        ) : aheadResult === null ? (
+          <p className="text-ink-500 text-sm font-body leading-relaxed">
+            Datos insuficientes para estimar el modelo sobre el histórico completo.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="col-span-1 lg:col-span-2 flex flex-col gap-3">
+              <Chart
+                data={aheadChartData}
+                lines={[
+                  { key: 'Histórico', name: 'Histórico (últimos 24)', color: '#7d8892', strokeWidth: 2, strokeDasharray: '4 4' },
+                  { key: 'Proyección', name: `Proyección (+${v.forecastHorizon})`, color: '#e0a274', strokeWidth: 2.5 },
+                  { key: 'Truncado', name: 'Fuera de rango (truncado)', color: '#f87171', strokeWidth: 0 }
+                ]}
+                area={aheadResult.bandLo ? { keyLower: 'Lower', keyUpper: 'Upper', color: '#4fb3a0', name: 'Incertidumbre' } : undefined}
+                referenceX={data[n - 1]?.date}
+                ariaLabel={`Proyección recursiva de ${v.forecastHorizon} períodos a futuro con el modelo ${MODEL_LABELS[v.model]}`}
+              />
+              {aheadResult.outOfConfidence.some(f => f) && (
+                <p className="text-xs font-body text-red-400">
+                  {aheadResult.outOfConfidence.filter(f => f).length} punto(s) excedieron el rango de confianza
+                  (máx/mín histórico ± 3× el rango) y fueron truncados — la recursión se desbocó: no confíes en
+                  ese tramo. Es el riesgo clásico del pronóstico recursivo cerca de raíz unitaria.
+                </p>
+              )}
+              <DownloadCsvButton
+                filename={`proyeccion_${v.model}_h${v.forecastHorizon}.csv`}
+                rows={aheadChartData.filter(r => r.Proyección !== null).map(r => ({
+                  periodo: r.date,
+                  proyeccion: r.Proyección,
+                  banda_inf: r.Lower,
+                  banda_sup: r.Upper,
+                  truncado: r.Truncado !== null ? 'sí' : ''
+                }))}
+              />
+            </div>
+            <div className="col-span-1 flex flex-col gap-4">
+              <Slider label="Horizonte (períodos)" min={1} max={24} step={1} value={v.forecastHorizon} onChange={val => set({ forecastHorizon: val })} />
+              {(v.model === 'arimax' || v.model === 'hybrid') ? (
+                <div>
+                  <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-500 mb-3">Escenario de exógenas (%/período)</h3>
+                  {EXOG_KEYS.map((k, i) => (
+                    <Slider
+                      key={k}
+                      label={['Crecimiento', 'Dólar', 'Inventarios', 'Libor', 'Posición espec.'][i]}
+                      min={-2} max={2} step={0.1}
+                      value={v.exogScenario[k]}
+                      onChange={val => set({ exogScenario: { ...v.exogScenario, [k]: val } })}
+                      unit="%"
+                    />
+                  ))}
+                  <p className="text-ink-500 text-xs font-body leading-relaxed">
+                    Con tasa 0 (default), cada exógena se mantiene constante en su último valor observado —
+                    una simplificación deliberada, no una predicción de esas variables. Ajusta las tasas para
+                    explorar escenarios ("¿y si el dólar sube 1% por período?").
+                  </p>
+                </div>
+              ) : (
+                <p className="text-ink-500 text-xs font-body leading-relaxed">
+                  {v.model === 'gpr'
+                    ? 'El GPR extrapola sin recursión: la media revierte hacia la histórica y la banda se ensancha — el modelo declarando "aquí ya no sé". No usa exógenas.'
+                    : 'ARIMA no usa exógenas: la proyección depende sólo de la inercia de la serie.'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </Panel>
     </div>
   );
