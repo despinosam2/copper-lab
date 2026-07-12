@@ -14,7 +14,7 @@
 
 import { ols, cholesky, forwardSolve, backwardSolve } from './matrix';
 import { difference } from './arima';
-import { GprParams } from './gpr';
+import { GprParams, kernel } from './gpr';
 
 export interface ForecastResult {
   /** Predicción por índice original; null donde el modelo no puede predecir. */
@@ -83,15 +83,13 @@ export function arimaxForecast(
   return { fitted };
 }
 
-function rbf(x1: number, x2: number, l: number, sigmaF2: number): number {
-  const diff = x1 - x2;
-  return sigmaF2 * Math.exp(-(diff * diff) / (2 * l * l));
-}
-
 /**
  * Núcleo GPR genérico: entrena con (xTrain, yTrain) y predice en xQuery.
  * Estandariza y SOLO con el tramo de entrenamiento (sin fuga de información).
  * Con xQuery = xTrain reproduce fitGpr exactamente.
+ * R20: usa kernel() de gpr.ts (RBF puro por defecto, RBF+periódico si
+ * params.kernelMode lo pide) — la copia local de rbf se eliminó para que
+ * las pestañas 04 y 07 no puedan divergir en la definición del kernel.
  */
 export function gprPredict(
   xTrain: number[],
@@ -101,7 +99,7 @@ export function gprPredict(
 ): { mean: number[]; variance: number[] } {
   const m = xTrain.length;
   if (m === 0) return { mean: [], variance: [] };
-  const { lengthScale, signalVariance, noiseVariance } = params;
+  const { noiseVariance } = params;
 
   const yMean = yTrain.reduce((s, v) => s + v, 0) / m;
   const yStd = Math.max(Math.sqrt(yTrain.reduce((s, v) => s + (v - yMean) ** 2, 0) / m), 1e-9);
@@ -110,7 +108,7 @@ export function gprPredict(
   const K: number[][] = Array(m).fill(0).map(() => Array(m).fill(0));
   for (let i = 0; i < m; i++) {
     for (let j = 0; j < m; j++) {
-      K[i][j] = rbf(xTrain[i], xTrain[j], lengthScale, signalVariance);
+      K[i][j] = kernel(xTrain[i], xTrain[j], params);
       if (i === j) K[i][j] += noiseVariance;
     }
   }
@@ -120,14 +118,14 @@ export function gprPredict(
   const mean: number[] = [];
   const variance: number[] = [];
   for (const xq of xQuery) {
-    const kStar = xTrain.map(xt => rbf(xq, xt, lengthScale, signalVariance));
+    const kStar = xTrain.map(xt => kernel(xq, xt, params));
     let mu = 0;
     for (let j = 0; j < m; j++) mu += kStar[j] * alpha[j];
     mean.push(mu * yStd + yMean);
     const v = forwardSolve(L, kStar);
     let vTv = 0;
     for (let j = 0; j < m; j++) vTv += v[j] * v[j];
-    variance.push((rbf(xq, xq, lengthScale, signalVariance) + noiseVariance - vTv) * yStd * yStd);
+    variance.push((kernel(xq, xq, params) + noiseVariance - vTv) * yStd * yStd);
   }
   return { mean, variance };
 }

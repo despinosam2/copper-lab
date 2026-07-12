@@ -56,7 +56,12 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
         }
         case 'gpr': {
           // R06: idem para el GPR sin fuga (pestaña 04 si no hay override).
-          const cfg = v.gprOverride ?? { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance };
+          // R20: incluye el modo de kernel de la pestaña 04 + period en
+          // unidades de x (12 observaciones, mismo denominador n−1 que R09).
+          const cfg = {
+            ...(v.gprOverride ?? { lengthScale: gpr.lengthScale, signalVariance: gpr.signalVariance, noiseVariance: gpr.noiseVariance, kernelMode: gpr.kernelMode, periodicLengthScale: gpr.periodicLengthScale, periodicVariance: gpr.periodicVariance }),
+            period: 12 / Math.max(n - 1, 1)
+          };
           return v.gprMode === 'extrapolate'
             ? gprForecast(y, cfg, cut, gpr.bandSigma)
             : gprOneStepForecast(y, cfg, cut, gpr.bandSigma);
@@ -120,7 +125,12 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
       const denom = Math.max(n - 1, 1);
       const xTrain = Array(trainEnd).fill(0).map((_, i) => i / denom);
       const yTrain = y.slice(0, trainEnd);
-      const best = await autoTuneGpr(xTrain, yTrain, GPR_NO_LEAK_BOUNDS);
+      // R20: si la pestaña 04 está en modo compuesto, el autoajuste sin fuga
+      // también busca lp y σp² (mismos rangos que el botón de la pestaña 04).
+      const best = await autoTuneGpr(xTrain, yTrain, GPR_NO_LEAK_BOUNDS, 6,
+        gpr.kernelMode === 'rbf+periodic'
+          ? { period: 12 / denom, lpBounds: [0.1, 3.0], sp2Bounds: [0.01, 2.0] }
+          : undefined);
       set({ gprOverride: best });
       setNoLeakMsg(`l=${best.lengthScale.toFixed(3)} · σf²=${best.signalVariance.toFixed(2)} · σn²=${best.noiseVariance.toFixed(3)} (sólo entrenamiento).`);
       setNoLeakTuning(false);

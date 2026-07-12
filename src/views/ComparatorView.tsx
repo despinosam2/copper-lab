@@ -43,8 +43,9 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
     const mArimax = fitArimax(y, axExog, arimax.p, arimax.d);
     const metArimax = metricsFrom(mArimax.fitted);
 
-    // GPR — configuración de la pestaña 04
-    const mGpr = fitGpr(x_gpr, y, gpr);
+    // GPR — configuración de la pestaña 04 (R20: period en unidades de x,
+    // 12 observaciones — mismo cálculo que hace GprView).
+    const mGpr = fitGpr(x_gpr, y, { ...gpr, period: 12 / Math.max(data.length - 1, 1) });
     const metGpr = metricsFrom(mGpr.mean);
 
     // Híbrido — configuración de la pestaña 05 (σf² y σn² fijos como en esa vista)

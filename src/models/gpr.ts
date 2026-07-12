@@ -4,6 +4,19 @@ export interface GprParams {
   lengthScale: number; // l
   signalVariance: number; // sigma_f^2
   noiseVariance: number; // sigma_n^2
+  /**
+   * R20: modo de kernel. 'rbf' (default, comportamiento histórico) o
+   * 'rbf+periodic' (suma de RBF + kernel periódico — captura la
+   * estacionalidad anual que el RBF puro no puede representar). Los tres
+   * campos periódicos sólo se usan en modo compuesto.
+   */
+  kernelMode?: 'rbf' | 'rbf+periodic';
+  /** Período del ciclo en unidades de x (para 12 meses con x=i/(n−1): 12/(n−1)). */
+  period?: number;
+  /** Escala de longitud del kernel periódico (lp). */
+  periodicLengthScale?: number;
+  /** Varianza de la componente periódica (σp²). */
+  periodicVariance?: number;
 }
 
 export interface GprResult {
@@ -17,11 +30,41 @@ function rbf(x1: number, x2: number, l: number, sigmaF2: number): number {
   return sigmaF2 * Math.exp(-(diff * diff) / (2 * l * l));
 }
 
+/**
+ * R20: kernel periódico estándar (MacKay):
+ *   k(x,x') = σp² · exp(−2·sin²(π·|x−x'|/p) / lp²)
+ * Máximo (=σp²) cuando |x−x'| es múltiplo del período p — dos puntos
+ * separados exactamente un ciclo se consideran "vecinos" aunque estén
+ * lejos en el tiempo. Es lo que el RBF puro no puede expresar.
+ */
+export function periodic(x1: number, x2: number, lp: number, sigmaP2: number, period: number): number {
+  const s = Math.sin(Math.PI * Math.abs(x1 - x2) / period);
+  return sigmaP2 * Math.exp(-(2 * s * s) / (lp * lp));
+}
+
+/**
+ * R20: kernel activo según el modo. Con 'rbf' (o sin modo — todos los
+ * llamadores existentes) devuelve EXACTAMENTE rbf(...): el default es
+ * bit-a-bit idéntico al comportamiento histórico. Con 'rbf+periodic'
+ * devuelve la SUMA de ambos (suma de kernels = suma de procesos
+ * independientes: tendencia suave + ciclo estacional).
+ */
+export function kernel(x1: number, x2: number, params: GprParams): number {
+  const base = rbf(x1, x2, params.lengthScale, params.signalVariance);
+  if (params.kernelMode !== 'rbf+periodic') return base;
+  return base + periodic(
+    x1, x2,
+    params.periodicLengthScale ?? 1.0,
+    params.periodicVariance ?? 0.3,
+    params.period ?? 0.125
+  );
+}
+
 export function fitGpr(x: number[], y: number[], params: GprParams): GprResult {
   const n = x.length;
   if (n === 0) return { mean: [], variance: [] };
 
-  const { lengthScale, signalVariance, noiseVariance } = params;
+  const { noiseVariance } = params;
 
   // Estandarizamos y (media 0, desviación 1) antes de ajustar:
   //  - sin centrar, el prior 0 del GP encogería la predicción hacia 0;
@@ -33,11 +76,12 @@ export function fitGpr(x: number[], y: number[], params: GprParams): GprResult {
   const yStd = Math.max(Math.sqrt(y.reduce((s, v) => s + (v - yMean) ** 2, 0) / n), 1e-9);
   const yc = y.map(v => (v - yMean) / yStd);
 
-  // Build Covariance Matrix K
+  // Build Covariance Matrix K (R20: kernel() respeta el modo — con 'rbf' es
+  // exactamente el RBF de siempre).
   const K: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      K[i][j] = rbf(x[i], x[j], lengthScale, signalVariance);
+      K[i][j] = kernel(x[i], x[j], params);
       if (i === j) {
         K[i][j] += noiseVariance; // K + sigma_n^2 * I
       }
@@ -62,7 +106,7 @@ export function fitGpr(x: number[], y: number[], params: GprParams): GprResult {
     // k* is the covariance between x[i] and all training points
     const kStar = Array(n).fill(0);
     for (let j = 0; j < n; j++) {
-      kStar[j] = rbf(x[i], x[j], lengthScale, signalVariance);
+      kStar[j] = kernel(x[i], x[j], params);
     }
 
     // mean = k*^T * alpha, des-estandarizado a las unidades originales
@@ -79,7 +123,7 @@ export function fitGpr(x: number[], y: number[], params: GprParams): GprResult {
     for (let j = 0; j < n; j++) {
       vT_v += v[j] * v[j];
     }
-    const stdVariance = rbf(x[i], x[i], lengthScale, signalVariance) + noiseVariance - vT_v;
+    const stdVariance = kernel(x[i], x[i], params) + noiseVariance - vT_v;
     // De vuelta a unidades originales (la varianza escala con yStd²)
     variance[i] = stdVariance * yStd * yStd;
   }
@@ -110,14 +154,16 @@ function logspace(min: number, max: number, steps: number): number[] {
  * combinación de hiperparámetros. Reutiliza la misma factorización de
  * Cholesky que fitGpr — es literalmente el mismo cálculo, evaluado para
  * comparar hiperparámetros en vez de para predecir.
+ * R20: recibe GprParams completo para poder evaluar también el kernel
+ * compuesto (con modo 'rbf' es idéntico al comportamiento anterior).
  */
-function negLogMarginalLikelihood(x: number[], yc: number[], l: number, sigmaF2: number, sigmaN2: number): number {
+function negLogMarginalLikelihood(x: number[], yc: number[], params: GprParams): number {
   const n = x.length;
   const K: number[][] = Array(n).fill(0).map(() => Array(n).fill(0));
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      K[i][j] = rbf(x[i], x[j], l, sigmaF2);
-      if (i === j) K[i][j] += sigmaN2;
+      K[i][j] = kernel(x[i], x[j], params);
+      if (i === j) K[i][j] += params.noiseVariance;
     }
   }
   const L = cholesky(K);
@@ -148,15 +194,30 @@ function negLogMarginalLikelihood(x: number[], yc: number[], l: number, sigmaF2:
  * tomar más de un segundo, y sin ceder el hilo el navegador se congela por
  * completo durante la búsqueda (ni siquiera pinta "Calculando…").
  */
-export async function autoTuneGpr(x: number[], y: number[], bounds: GprBounds, steps = 6): Promise<GprParams> {
+export async function autoTuneGpr(
+  x: number[],
+  y: number[],
+  bounds: GprBounds,
+  steps = 6,
+  /**
+   * R20: modo compuesto opcional. Con periodicOpts, la grilla se extiende a
+   * 5 dimensiones (l, σf², σn², lp, σp²) con `compositeSteps` valores por
+   * dimensión (4 por defecto, no 6: 4⁵=1.024 evaluaciones vs 6⁵=7.776 —
+   * la resolución del riesgo de rendimiento anotado en el blueprint §R20).
+   */
+  periodicOpts?: { period: number; lpBounds: [number, number]; sp2Bounds: [number, number]; compositeSteps?: number }
+): Promise<GprParams> {
   const n = y.length;
   const yMean = y.reduce((s, v) => s + v, 0) / n;
   const yStd = Math.max(Math.sqrt(y.reduce((s, v) => s + (v - yMean) ** 2, 0) / n), 1e-9);
   const yc = y.map(v => (v - yMean) / yStd);
 
-  const lVals = logspace(bounds.lengthScale[0], bounds.lengthScale[1], steps);
-  const sf2Vals = logspace(bounds.signalVariance[0], bounds.signalVariance[1], steps);
-  const sn2Vals = logspace(bounds.noiseVariance[0], bounds.noiseVariance[1], steps);
+  const gridSteps = periodicOpts ? (periodicOpts.compositeSteps ?? 4) : steps;
+  const lVals = logspace(bounds.lengthScale[0], bounds.lengthScale[1], gridSteps);
+  const sf2Vals = logspace(bounds.signalVariance[0], bounds.signalVariance[1], gridSteps);
+  const sn2Vals = logspace(bounds.noiseVariance[0], bounds.noiseVariance[1], gridSteps);
+  const lpVals = periodicOpts ? logspace(periodicOpts.lpBounds[0], periodicOpts.lpBounds[1], gridSteps) : [undefined];
+  const sp2Vals = periodicOpts ? logspace(periodicOpts.sp2Bounds[0], periodicOpts.sp2Bounds[1], gridSteps) : [undefined];
 
   let best: GprParams = { lengthScale: lVals[0], signalVariance: sf2Vals[0], noiseVariance: sn2Vals[0] };
   let bestNll = Infinity;
@@ -164,11 +225,21 @@ export async function autoTuneGpr(x: number[], y: number[], bounds: GprBounds, s
   for (const l of lVals) {
     for (const sf2 of sf2Vals) {
       for (const sn2 of sn2Vals) {
-        const nll = negLogMarginalLikelihood(x, yc, l, sf2, sn2);
-        if (nll < bestNll) {
-          bestNll = nll;
-          best = { lengthScale: l, signalVariance: sf2, noiseVariance: sn2 };
+        for (const lp of lpVals) {
+          for (const sp2 of sp2Vals) {
+            const candidate: GprParams = periodicOpts
+              ? { lengthScale: l, signalVariance: sf2, noiseVariance: sn2, kernelMode: 'rbf+periodic', period: periodicOpts.period, periodicLengthScale: lp, periodicVariance: sp2 }
+              : { lengthScale: l, signalVariance: sf2, noiseVariance: sn2 };
+            const nll = negLogMarginalLikelihood(x, yc, candidate);
+            if (nll < bestNll) {
+              bestNll = nll;
+              best = candidate;
+            }
+          }
         }
+        // R20: en modo compuesto la grilla interior es 4²=16 Cholesky por
+        // (l,σf²,σn²) — se cede el hilo también aquí, no sólo por valor de l.
+        if (periodicOpts) await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
     await new Promise(resolve => setTimeout(resolve, 0));

@@ -118,8 +118,34 @@ Hiperparámetros:
 - `σf²` (varianza de señal): amplitud de variaciones permitidas.
 - `σn²` (varianza de ruido): cuánto ruido de observación se asume.
 
+### Kernel compuesto opcional (v2.2)
+
+El RBF puro no puede representar ciclos: la estacionalidad anual del dataset
+sintético (`0.25·sin(2πt/12)`) queda estructuralmente fuera de su alcance.
+El modo **RBF + periódico** suma un segundo kernel (suma de kernels = suma de
+procesos independientes: tendencia suave + ciclo estacional):
+
+```
+k(x, x') = k_RBF(x, x') + σp² · exp( −2·sin²(π·|x − x'|/p) / lp² )
+```
+
+con `p` = período fijo de 12 observaciones expresado en unidades de x
+(`12/(n−1)`), `lp` = escala de longitud periódica y `σp²` = varianza de la
+componente periódica. La firma del kernel periódico: dos puntos separados
+exactamente un período se tratan como vecinos (correlación máxima) aunque
+estén lejos en el tiempo. Con datos trimestrales el ciclo anual es de 4
+observaciones y este kernel (período 12) no lo capturará — limitación
+documentada en la propia pantalla.
+
+El autoajuste por verosimilitud marginal en modo compuesto extiende la grilla
+a 5 dimensiones con 4 valores por dimensión (4⁵ = 1.024 evaluaciones, en vez
+de 6⁵ = 7.776 — para mantener el tiempo de cálculo acotado).
+
 **Valor pedagógico:** la banda ±2σ enseña que un buen modelo **sabe cuánto no
-sabe**. Es el único de los cinco que cuantifica incertidumbre.
+sabe**. Es el único de los cinco que cuantifica incertidumbre. Y el kernel
+compuesto enseña que el kernel ES el supuesto del modelo: el RBF asume
+"suavidad", el periódico asume "ciclo" — elegir kernel es declarar qué
+estructura crees que tienen tus datos.
 
 ---
 
