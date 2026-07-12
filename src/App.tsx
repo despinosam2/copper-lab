@@ -52,6 +52,16 @@ export default function App() {
             </h1>
             <p className="text-ink-500 font-body text-sm mt-1">Modelado interactivo de precios de commodities · Caso del cobre</p>
           </div>
+          {/* R14: la guía de estudio vive en el repo, no en la app — sin este
+              enlace, un estudiante sin el profesor al lado no sabría que existe. */}
+          <a
+            href="https://github.com/despinosam2/copper-lab/blob/main/GUIA%20DE%20ESTUDIO.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-body text-ink-500 hover:text-patina-light underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina rounded-sm"
+          >
+            Guía de estudio (8 noches)
+          </a>
         </header>
 
         {/* Dataset Bar — F1: semilla, ruido, importar CSV/Excel (01 PRD) */}
