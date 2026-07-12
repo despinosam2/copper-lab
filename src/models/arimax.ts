@@ -13,7 +13,18 @@ export interface ArimaxResult {
   diffResiduals: number[];
 }
 
-export function fitArimax(y: number[], exog: number[][], p: number, d: number): ArimaxResult {
+/**
+ * R22: con `diffExog = true` y d ≥ 1, las exógenas se diferencian d veces
+ * junto con la serie. Sin esto (default histórico), se regresa Δᵈy sobre
+ * X en NIVELES contemporáneos — si X es no estacionaria (dólar, libor),
+ * eso reintroduce el riesgo de relación espuria que la diferenciación de y
+ * sacó por la puerta, y hace extraña la lectura económica del β ("un nivel
+ * alto del dólar produce caídas perpetuas del precio"). Con d = 0 el toggle
+ * no aplica (no hay nada que igualar). Default false: comportamiento
+ * bit-a-bit idéntico al histórico (los números dorados del manual — ARIMAX
+ * 26.1 con el Excel del curso — no cambian sin acción explícita del usuario).
+ */
+export function fitArimax(y: number[], exog: number[][], p: number, d: number, diffExog = false): ArimaxResult {
   const n = y.length;
   if (n <= p + d) {
     return { fitted: Array(n).fill(0), coefficients: [], exogCoefficients: [], intercept: 0, residuals: [], designMatrix: [], diffResiduals: [] };
@@ -21,12 +32,22 @@ export function fitArimax(y: number[], exog: number[][], p: number, d: number): 
 
   // 1. Difference the series
   const diffed = difference(y, d);
-  
+
   // 2. Build design matrix and target vector
   const X: number[][] = [];
   const target: number[] = [];
   const numExog = exog.length > 0 ? exog[0].length : 0;
-  
+
+  // R22: valor de la exógena k para la fila con objetivo diffed[t]
+  // (índice original t+d). Diferenciadas: diffedExogCols[k][t] está alineada
+  // con diffed[t] por construcción (ambas pierden las primeras d posiciones).
+  const useDiffExog = diffExog && d > 0 && numExog > 0;
+  const diffedExogCols: number[][] = useDiffExog
+    ? Array(numExog).fill(0).map((_, k) => difference(exog.map(r => r[k]), d))
+    : [];
+  const exogAt = (t: number, k: number): number =>
+    useDiffExog ? diffedExogCols[k][t] : exog[t + d][k];
+
   for (let t = p; t < diffed.length; t++) {
     const row = [1]; // intercept
     for (let i = 1; i <= p; i++) {
@@ -34,7 +55,7 @@ export function fitArimax(y: number[], exog: number[][], p: number, d: number): 
     }
     // Add exogenous variables for time t+d in original series, which corresponds to t in differenced
     for (let k = 0; k < numExog; k++) {
-      row.push(exog[t + d][k]);
+      row.push(exogAt(t, k));
     }
     X.push(row);
     target.push(diffed[t]);
@@ -54,7 +75,7 @@ export function fitArimax(y: number[], exog: number[][], p: number, d: number): 
       pred += coefficients[i - 1] * diffed[t - i];
     }
     for (let k = 0; k < numExog; k++) {
-      pred += exogCoefficients[k] * exog[t + d][k];
+      pred += exogCoefficients[k] * exogAt(t, k);
     }
     diffFitted[t] = pred;
   }

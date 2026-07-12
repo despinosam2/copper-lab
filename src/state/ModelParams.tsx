@@ -41,6 +41,13 @@ export interface ArimaxState {
   useStocks: boolean;
   useLibor: boolean;
   usePartLargas: boolean;
+  /**
+   * R22: diferenciar también las exógenas cuando d ≥ 1 (evita regresar Δᵈy
+   * sobre niveles no estacionarios). Default false = comportamiento
+   * histórico — los números dorados del manual no cambian sin acción
+   * explícita del usuario.
+   */
+  diffExog: boolean;
 }
 
 export interface GprState {
@@ -166,6 +173,7 @@ export function ModelParamsProvider({ children, initial }: { children: ReactNode
     useStocks: false,
     useLibor: false,
     usePartLargas: false,
+    diffExog: false,
     ...initial?.arimax
   });
   const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2, kernelMode: 'rbf', periodicLengthScale: 1.0, periodicVariance: 0.3, ...initial?.gpr });

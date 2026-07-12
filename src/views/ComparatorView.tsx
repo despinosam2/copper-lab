@@ -40,7 +40,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
     // ARIMAX — configuración de la pestaña 03 (incluye toggles de covariables)
     const axExog = buildExogMatrix(data, arimax);
     const axCovars = activeExogDefs(arimax).map(def => def.shortLabel);
-    const mArimax = fitArimax(y, axExog, arimax.p, arimax.d);
+    const mArimax = fitArimax(y, axExog, arimax.p, arimax.d, arimax.diffExog);
     const metArimax = metricsFrom(mArimax.fitted);
 
     // GPR — configuración de la pestaña 04 (R20: period en unidades de x,
@@ -60,7 +60,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
       { name: 'ARIMA', config: `p=${arima.p} · d=${arima.d}`, ...metArima },
       {
         name: 'ARIMAX',
-        config: `p=${arimax.p} · d=${arimax.d}${axCovars.length > 0 ? ' · ' + axCovars.join(', ') : ' · sin covariables'}`,
+        config: `p=${arimax.p} · d=${arimax.d}${axCovars.length > 0 ? ' · ' + axCovars.join(', ') : ' · sin covariables'}${arimax.diffExog && arimax.d >= 1 ? ' · Δexóg' : ''}`,
         ...metArimax
       },
       {
