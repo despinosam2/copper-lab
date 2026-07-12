@@ -88,6 +88,18 @@ mismo sistema lineal:
 Aquí X puede incluir crecimiento global y el índice del dólar. Los `β` se estiman
 junto con los `φ` por OLS.
 
+**Limitación honesta (niveles vs. diferencias):** con `d ≥ 1` el objetivo es
+el *cambio* del precio, pero por defecto las X entran en **niveles**
+contemporáneos. Si una exógena es no estacionaria (dólar, libor), esto
+reintroduce el riesgo de relación espuria que la diferenciación de `y` evitó,
+y hace extraña la lectura del β ("un nivel alto del dólar produce caídas
+perpetuas del precio"). El toggle **"Diferenciar exógenas con la serie
+(ΔᵈX)"** de la pantalla iguala los espacios (Δprecio explicado por Δdólar).
+Viene apagado por defecto para no alterar los números de referencia del
+curso sin acción explícita; el estándar econométrico para series I(1) sería
+diferenciarlas, usar rezagos, o un modelo de corrección de errores (fuera de
+alcance).
+
 **Valor pedagógico:** al comparar su RMSE con el de ARIMA, el estudiante ve
 si las covariables aportan información real o no.
 

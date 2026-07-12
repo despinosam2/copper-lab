@@ -34,13 +34,23 @@ export function arimaxForecast(
   exog: number[][],
   p: number,
   d: number,
-  trainEnd: number
+  trainEnd: number,
+  /** R22: diferenciar también las exógenas (misma semántica que fitArimax). */
+  diffExog = false
 ): ForecastResult {
   const n = y.length;
   const numExog = exog.length > 0 ? exog[0].length : 0;
   if (trainEnd <= p + d + numExog + 2 || n <= p + d) return { fitted: nulls(n) };
 
   const diffed = difference(y, d);
+
+  // R22: mismo tratamiento de exógenas que fitArimax (niveles o diferenciadas).
+  const useDiffExog = diffExog && d > 0 && numExog > 0;
+  const diffedExogCols: number[][] = useDiffExog
+    ? Array(numExog).fill(0).map((_, k) => difference(exog.map(r => r[k]), d))
+    : [];
+  const exogAt = (t: number, k: number): number =>
+    useDiffExog ? diffedExogCols[k][t] : exog[t + d][k];
 
   // Misma matriz de diseño que fitArimax (intercepto + rezagos + exógenas
   // contemporáneas), guardando el índice original del objetivo de cada fila.
@@ -50,7 +60,7 @@ export function arimaxForecast(
   for (let t = p; t < diffed.length; t++) {
     const row = [1];
     for (let i = 1; i <= p; i++) row.push(diffed[t - i]);
-    for (let k = 0; k < numExog; k++) row.push(exog[t + d][k]);
+    for (let k = 0; k < numExog; k++) row.push(exogAt(t, k));
     rows.push(row);
     targets.push(diffed[t]);
     origIdx.push(t + d);
@@ -211,10 +221,12 @@ export function hybridForecast(
   d: number,
   gprParams: GprParams,
   trainEnd: number,
-  bandSigma: 1 | 2 = 2
+  bandSigma: 1 | 2 = 2,
+  /** R22: diferenciar también las exógenas de la etapa lineal. */
+  diffExog = false
 ): ForecastResult {
   const n = y.length;
-  const base = arimaxForecast(y, exog, p, d, trainEnd);
+  const base = arimaxForecast(y, exog, p, d, trainEnd, diffExog);
   if (base.fitted.every(v => v === null)) return { fitted: nulls(n) };
 
   const residuals = y.map((v, i) => {

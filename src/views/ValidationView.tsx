@@ -52,7 +52,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
           // R06: si hay un autoajuste sin fuga (sólo entrenamiento), se usa
           // en vez de la configuración compartida de la pestaña 03.
           const cfg = v.arimaxOverride ?? arimax;
-          return arimaxForecast(y, buildExogMatrix(data, cfg), cfg.p, cfg.d, cut);
+          return arimaxForecast(y, buildExogMatrix(data, cfg), cfg.p, cfg.d, cut, cfg.diffExog);
         }
         case 'gpr': {
           // R06: idem para el GPR sin fuga (pestaña 04 si no hay override).
@@ -100,7 +100,8 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
     setTimeout(async () => {
       const best = await autoTuneArimaxBic(data.slice(0, trainEnd));
       if (best) {
-        set({ arimaxOverride: { p: best.p, d: best.d, ...best.flags } });
+        // R22: el tuner BIC no busca diffExog — se hereda el de la pestaña 03.
+        set({ arimaxOverride: { p: best.p, d: best.d, ...best.flags, diffExog: arimax.diffExog } });
         const nVars = Object.values(best.flags).filter(Boolean).length;
         setNoLeakMsg(`BIC mínimo (sólo entrenamiento): p=${best.p}, d=${best.d}, ${nVars} covariable${nVars === 1 ? '' : 's'}.`);
       } else {
@@ -164,7 +165,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
       case 'arimax': {
         const cfg = v.arimaxOverride ?? arimax;
         const covars = activeExogDefs(cfg).map(def => def.shortLabel);
-        return `p=${cfg.p} · d=${cfg.d}${covars.length > 0 ? ' · ' + covars.join(', ') : ' · sin covariables'}${v.arimaxOverride ? ' · sin fuga' : ''}`;
+        return `p=${cfg.p} · d=${cfg.d}${covars.length > 0 ? ' · ' + covars.join(', ') : ' · sin covariables'}${cfg.diffExog && cfg.d >= 1 ? ' · Δexóg' : ''}${v.arimaxOverride ? ' · sin fuga' : ''}`;
       }
       case 'gpr': {
         const cfg = v.gprOverride ?? gpr;
@@ -246,7 +247,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
           // ARIMAX: conjunto activo menos la covariable ablacionada
           const kept = activeExogDefs(arimax).filter(f => f.key !== def.key);
           const exog = data.map(r => kept.map(f => r[f.key]));
-          fitted = arimaxForecast(y, exog, arimax.p, arimax.d, trainEnd).fitted;
+          fitted = arimaxForecast(y, exog, arimax.p, arimax.d, trainEnd, arimax.diffExog).fitted;
         }
         const rmse = testRmse(y, fitted, trainEnd);
         // R03: el nombre de VISUALIZACIÓN se anota si la covariable fue

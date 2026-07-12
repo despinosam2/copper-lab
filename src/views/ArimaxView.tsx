@@ -62,7 +62,7 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
     const exog = buildExogMatrix(data, arimax);
     const activeDefs = activeExogDefs(arimax);
 
-    const model = fitArimax(y, exog, p, d);
+    const model = fitArimax(y, exog, p, d, arimax.diffExog);
 
     const chartData = data.map((row, i) => ({
       date: row.date,
@@ -151,6 +151,29 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
               );
             })}
           </div>
+
+          {/* R22 (hallazgo A4): con d≥1 el modelo regresa Δᵈy; dejar las
+              exógenas en NIVELES mezcla objetivo diferenciado con regresores
+              posiblemente no estacionarios. El toggle las diferencia junto
+              con la serie. Apagado por defecto: los números dorados del
+              manual no cambian sin acción explícita. */}
+          <label className={`mt-4 flex items-center gap-2 group ${d >= 1 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+            <input
+              type="checkbox"
+              checked={arimax.diffExog}
+              disabled={d < 1}
+              onChange={e => setArimax({ ...arimax, diffExog: e.target.checked })}
+              className="form-checkbox bg-slate-850 border-slate-700 text-patina focus:ring-patina disabled:cursor-not-allowed"
+            />
+            <span className="font-body text-sm text-ink-300 group-hover:text-ink-100 transition-colors">
+              Diferenciar exógenas con la serie (ΔᵈX)
+            </span>
+          </label>
+          <p className="text-ink-500 text-xs mt-1.5 font-body leading-relaxed">
+            {d >= 1
+              ? 'Con d≥1 el modelo explica el CAMBIO del precio; dejar el dólar o el libor en niveles mezcla un objetivo diferenciado con regresores posiblemente no estacionarios (riesgo de relación espuria) y hace extraña la lectura del β. Diferenciarlas iguala los espacios: Δprecio explicado por Δdólar.'
+              : 'Sólo aplica con d≥1 (con d=0 el objetivo ya está en niveles, igual que las exógenas).'}
+          </p>
 
           <button
             onClick={handleAutoTune}
