@@ -92,11 +92,11 @@ export function StructuralView({ data: _data }: { data: CopperRow[] }) {
           <p className="font-mono text-xs text-ink-500 mb-3">
             P = P₀ + demanda + oferta + inventarios + dólar + energía
           </p>
-          <div className="h-64">
+          <div className="h-64" role="img" aria-label="Descomposición del precio en barras: base P0 más los aportes de demanda, oferta, inventarios, dólar y energía">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={decompBars} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <XAxis type="number" stroke="#78838d" tick={{ fill: '#78838d', fontSize: 12, fontFamily: 'IBM Plex Mono' }} />
-                <YAxis type="category" dataKey="name" stroke="#78838d" tick={{ fill: '#aab4bd', fontSize: 12, fontFamily: 'Inter' }} width={90} />
+                <XAxis type="number" stroke="#7d8892" tick={{ fill: '#7d8892', fontSize: 12, fontFamily: 'IBM Plex Mono' }} />
+                <YAxis type="category" dataKey="name" stroke="#7d8892" tick={{ fill: '#aab4bd', fontSize: 12, fontFamily: 'Inter' }} width={90} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#171c22', border: '1px solid #28313b', borderRadius: '3px', color: '#e8ecef', fontFamily: 'IBM Plex Mono' }}
                   labelStyle={{ color: '#e8ecef' }}
@@ -182,14 +182,14 @@ Pₜ = Pₜ₋₁ + λ·(P̄·(I*/Iₜ)^φ − Pₜ₋₁)       precio (λ=0.15
             />
           </div>
 
-          <div className="h-72">
+          <div className="h-72" role="img" aria-label="Simulación dinámica de 40 trimestres: precio, demanda, oferta e inventarios acoplados en el tiempo">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={sim.series} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#28313b" vertical={false} />
                 <XAxis
                   dataKey="t"
-                  stroke="#78838d"
-                  tick={{ fill: '#78838d', fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+                  stroke="#7d8892"
+                  tick={{ fill: '#7d8892', fontSize: 11, fontFamily: 'IBM Plex Mono' }}
                   tickFormatter={(t: number) => `T${t}`}
                   minTickGap={24}
                 />
@@ -204,8 +204,8 @@ Pₜ = Pₜ₋₁ + λ·(P̄·(I*/Iₜ)^φ − Pₜ₋₁)       precio (λ=0.15
                 <YAxis
                   yAxisId="mt"
                   orientation="right"
-                  stroke="#78838d"
-                  tick={{ fill: '#78838d', fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+                  stroke="#7d8892"
+                  tick={{ fill: '#7d8892', fontSize: 11, fontFamily: 'IBM Plex Mono' }}
                   tickFormatter={(v: number) => v.toFixed(1)}
                   domain={[0, 'auto']}
                   width={45}
@@ -226,7 +226,7 @@ Pₜ = Pₜ₋₁ + λ·(P̄·(I*/Iₜ)^φ − Pₜ₋₁)       precio (λ=0.15
                   <ReferenceLine yAxisId="price" x={dynamics.shockQuarter} stroke="#79d4c2" strokeDasharray="4 4" />
                 )}
                 <Area yAxisId="mt" dataKey="inventory" name="Inventarios" fill="#4fb3a0" fillOpacity={0.15} stroke="#4fb3a0" strokeOpacity={0.4} isAnimationActive={false} />
-                <Line yAxisId="mt" dataKey="demand" name="Demanda" stroke="#78838d" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+                <Line yAxisId="mt" dataKey="demand" name="Demanda" stroke="#7d8892" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
                 <Line yAxisId="mt" dataKey="supply" name="Oferta" stroke="#79d4c2" dot={false} isAnimationActive={false} />
                 <Line yAxisId="price" dataKey="price" name="Precio" stroke="#e0a274" strokeWidth={2} dot={false} isAnimationActive={false} />
               </ComposedChart>

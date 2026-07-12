@@ -38,25 +38,31 @@ interface ChartProps {
   };
   /** Valor del eje X donde dibujar una línea vertical (p. ej. corte train/test). */
   referenceX?: string;
+  /** R21 (C4d): descripción para lectores de pantalla — los SVG de Recharts no exponen texto por sí solos. */
+  ariaLabel?: string;
 }
 
-export function Chart({ data, lines, area, referenceX }: ChartProps) {
+export function Chart({ data, lines, area, referenceX, ariaLabel }: ChartProps) {
   return (
-    <div className="w-full h-80">
+    <div
+      className="w-full h-80"
+      role="img"
+      aria-label={ariaLabel ?? `Gráfico de líneas: ${lines.map(l => l.name).join(', ')}`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           {/* El ancho del eje Y se adapta a etiquetas de 3 dígitos (datos reales en ¢/lb) */}
           <CartesianGrid strokeDasharray="3 3" stroke="#28313b" vertical={false} />
           <XAxis 
             dataKey="date" 
-            stroke="#78838d" 
-            tick={{ fill: '#78838d', fontSize: 12, fontFamily: 'IBM Plex Mono' }}
+            stroke="#7d8892" 
+            tick={{ fill: '#7d8892', fontSize: 12, fontFamily: 'IBM Plex Mono' }}
             tickMargin={10}
             minTickGap={30}
           />
           <YAxis
-            stroke="#78838d"
-            tick={{ fill: '#78838d', fontSize: 12, fontFamily: 'IBM Plex Mono' }}
+            stroke="#7d8892"
+            tick={{ fill: '#7d8892', fontSize: 12, fontFamily: 'IBM Plex Mono' }}
             domain={['auto', 'auto']}
             tickFormatter={(val) => val.toFixed(1)}
             width={55}

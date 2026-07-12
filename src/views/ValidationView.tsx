@@ -275,7 +275,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
             <Chart
               data={chartData}
               lines={[
-                { key: 'Observado', name: 'Observado', color: '#78838d', strokeWidth: 2, strokeDasharray: '4 4' },
+                { key: 'Observado', name: 'Observado', color: '#7d8892', strokeWidth: 2, strokeDasharray: '4 4' },
                 { key: 'Entrenamiento', name: 'Ajuste (entrenamiento)', color: '#79d4c2', strokeWidth: 1.5 },
                 { key: 'Prueba', name: 'Predicción (prueba)', color: '#e0a274', strokeWidth: 2.5 }
               ]}
@@ -472,10 +472,10 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
                   {impRunning ? 'Calculando…' : 'Medir importancia (quitar de a una)'}
                 </button>
                 {importance && (
-                  <div className="mt-4 h-44">
+                  <div className="mt-4 h-44" role="img" aria-label="Importancia de variables por ablación: cuánto empeora el RMSE de prueba al quitar cada covariable">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={importance} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                        <XAxis type="number" tick={{ fill: '#78838d', fontSize: 10, fontFamily: 'IBM Plex Mono' }} tickFormatter={(val: number) => val.toFixed(2)} stroke="#28313b" />
+                        <XAxis type="number" tick={{ fill: '#7d8892', fontSize: 10, fontFamily: 'IBM Plex Mono' }} tickFormatter={(val: number) => val.toFixed(2)} stroke="#28313b" />
                         <YAxis type="category" dataKey="name" width={90} tick={{ fill: '#aab4bd', fontSize: 10, fontFamily: 'IBM Plex Mono' }} stroke="#28313b" />
                         <Tooltip
                           contentStyle={{ backgroundColor: '#171c22', border: '1px solid #28313b', borderRadius: '3px', color: '#e8ecef', fontFamily: 'IBM Plex Mono', fontSize: 12 }}

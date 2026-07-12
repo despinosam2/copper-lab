@@ -237,8 +237,27 @@ export default function App() {
           <strong>Datos:</strong> Todo modelo depende de los datos. El ruido afecta la dificultad del problema. Sube el ruido y observa cómo se degradan las métricas.
         </div>
 
-        {/* Tab Navigation — 05 UI SPEC: numbered tabs, patina underline, ARIA tablist */}
-        <nav role="tablist" aria-label="Modelos" className="flex gap-1 border-b border-slate-700 overflow-x-auto no-scrollbar">
+        {/* Tab Navigation — 05 UI SPEC: numbered tabs, patina underline, ARIA tablist.
+            R21 (C4b): patrón WAI-ARIA APG completo — flechas ←/→ (con wrap),
+            Home/End, roving tabindex (sólo la pestaña activa es tabulable;
+            Tab salta directo al contenido). */}
+        <nav
+          role="tablist"
+          aria-label="Modelos"
+          className="flex gap-1 border-b border-slate-700 overflow-x-auto no-scrollbar"
+          onKeyDown={e => {
+            let next: number | null = null;
+            if (e.key === 'ArrowRight') next = (activeTab + 1) % TABS.length;
+            else if (e.key === 'ArrowLeft') next = (activeTab - 1 + TABS.length) % TABS.length;
+            else if (e.key === 'Home') next = 0;
+            else if (e.key === 'End') next = TABS.length - 1;
+            if (next !== null) {
+              e.preventDefault();
+              setActiveTab(next);
+              document.getElementById(`tab-${TABS[next].id}`)?.focus();
+            }
+          }}
+        >
           {TABS.map((tab, idx) => {
             const isActive = activeTab === idx;
             return (
@@ -248,6 +267,7 @@ export default function App() {
                 aria-selected={isActive}
                 aria-controls={`tabpanel-${tab.id}`}
                 id={`tab-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(idx)}
                 className={`relative px-4 py-3 flex items-center gap-3 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-sm ${isActive ? 'text-ink-100' : 'text-ink-500 hover:text-ink-300'}`}
               >
