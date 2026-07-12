@@ -142,24 +142,57 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
     return { chartData, evalResult, hasBand };
   }, [runModel, v.model, trainEnd, y, data]);
 
+  // R16: etiqueta de configuración por modelo — se captura en el momento de
+  // correr la validación (no en vivo), para que la tabla sea trazable aunque
+  // el usuario cambie sliders después. Mismo patrón de string que la columna
+  // "Configuración" del Comparador (pestaña 06).
+  const configLabel = (id: PredictorId): string => {
+    switch (id) {
+      case 'arima':
+        return `p=${arima.p} · d=${arima.d}`;
+      case 'arimax': {
+        const cfg = v.arimaxOverride ?? arimax;
+        const covars = activeExogDefs(cfg).map(def => def.shortLabel);
+        return `p=${cfg.p} · d=${cfg.d}${covars.length > 0 ? ' · ' + covars.join(', ') : ' · sin covariables'}${v.arimaxOverride ? ' · sin fuga' : ''}`;
+      }
+      case 'gpr': {
+        const cfg = v.gprOverride ?? gpr;
+        return `l=${cfg.lengthScale.toFixed(2)} · σn²=${cfg.noiseVariance.toFixed(3)} · ${v.gprMode === 'extrapolate' ? 'extrapolación' : 'un paso'}${v.gprOverride ? ' · sin fuga' : ''}`;
+      }
+      case 'hybrid':
+        return `p=${hybrid.p} · d=${hybrid.d} · l=${hybrid.lengthScale.toFixed(2)}`;
+      case 'ridge':
+        return `λ=${v.ridgeLambda.toFixed(2)} · ${v.mlLags} rezago(s)${v.mlDiff ? ' · Δprecio' : ''}`;
+      case 'knn':
+        return `k=${v.knnK} · ${v.mlLags} rezago(s)${v.mlDiff ? ' · Δprecio' : ''}`;
+      case 'forest':
+        return `${v.forestTrees} árboles · prof=${v.forestDepth} · ${v.mlLags} rezago(s)${v.mlDiff ? ' · Δprecio' : ''}`;
+    }
+  };
+
   // ---- Validación cruzada walk-forward (asíncrona, con cesión de hilo) ----
   const [cvRunning, setCvRunning] = useState(false);
-  const [cvResults, setCvResults] = useState<{ id: PredictorId; mean: number | null; std: number | null; perFold: (number | null)[] }[] | null>(null);
+  const [cvResults, setCvResults] = useState<{ id: PredictorId; config: string; mean: number | null; std: number | null; perFold: (number | null)[] }[] | null>(null);
+  // R16 (hallazgo A9): folds solicitados vs realmente usados — antes la
+  // reducción era silenciosa (el spec decía "se informa" y no se informaba).
+  const [cvFolds, setCvFolds] = useState<{ requested: number; used: number } | null>(null);
 
   const runWalkForward = (ids: PredictorId[]) => {
     setCvRunning(true);
     setCvResults(null);
+    setCvFolds(null);
     setTimeout(async () => {
       const folds = walkForwardFolds(n, v.folds, v.trainPct / 100);
+      setCvFolds({ requested: v.folds, used: folds.length });
       if (folds.length === 0) {
         setCvResults([]);
         setCvRunning(false);
         return;
       }
-      const out: { id: PredictorId; mean: number | null; std: number | null; perFold: (number | null)[] }[] = [];
+      const out: { id: PredictorId; config: string; mean: number | null; std: number | null; perFold: (number | null)[] }[] = [];
       for (const id of ids) {
         const r = await walkForwardRmse(y, folds, cut => runModel(id, cut).fitted);
-        out.push({ id, ...r });
+        out.push({ id, config: configLabel(id), ...r });
         await new Promise(res => setTimeout(res, 0)); // ceder el hilo entre modelos
       }
       out.sort((a, b) => (a.mean ?? Infinity) - (b.mean ?? Infinity));
@@ -474,12 +507,20 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
             Datos insuficientes para el walk-forward con este % de entrenamiento: baja el % o usa una serie más larga.
           </p>
         )}
+        {/* R16 (A9): informar la reducción de folds — antes era silenciosa. */}
+        {cvFolds && cvFolds.used > 0 && cvFolds.used < cvFolds.requested && (
+          <p className="mt-4 text-xs text-copper-light font-body">
+            Solicitaste {cvFolds.requested} folds; con estos datos se usan {cvFolds.used} (los bloques de
+            prueba de menos de 2 observaciones se descartan).
+          </p>
+        )}
         {cvResults && cvResults.length > 0 && (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm font-body">
               <thead>
                 <tr className="border-b border-slate-700 text-ink-300 text-left">
                   <th className="pb-2 font-medium">Modelo</th>
+                  <th className="pb-2 font-medium">Configuración</th>
                   {cvResults[0].perFold.map((_, i) => (
                     <th key={i} className="pb-2 font-medium text-right">Fold {i + 1}</th>
                   ))}
@@ -493,6 +534,7 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
                       {idx === 0 && <span className="w-2 h-2 rounded-full bg-patina inline-block mr-2"></span>}
                       {MODEL_LABELS[r.id]}
                     </td>
+                    <td className="py-2 font-mono text-xs text-ink-300">{r.config}</td>
                     {r.perFold.map((f, i) => (
                       <td key={i} className="py-2 text-right font-mono text-ink-300">{fmt(f)}</td>
                     ))}
