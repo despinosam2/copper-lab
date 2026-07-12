@@ -83,6 +83,14 @@ export function GprView({ data }: { data: CopperRow[] }) {
         <Note>
           GPR es un modelo no paramétrico que cuantifica incertidumbre. Baja la Escala de Longitud (l) al mínimo y observa cómo la curva sobreajusta persiguiendo el ruido, mientras la banda se estrecha.
         </Note>
+
+        {/* R14: preset clicable de la nota de arriba. */}
+        <button
+          onClick={() => setLengthScale(0.01)}
+          className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+        >
+          Provocar sobreajuste (l=0.01)
+        </button>
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">

@@ -160,6 +160,15 @@ Iₜ = Iₜ₋₁ + Qₜ − Dₜ                       inventarios
 Pₜ = Pₜ₋₁ + λ·(P̄·(I*/Iₜ)^φ − Pₜ₋₁)       precio (λ=0.15)`}
           </pre>
 
+          {/* R14: preset clicable — convierte la receta de la guía de estudio
+              ("L=8, εD=0.1 → ciclo de telaraña persistente") en un botón. */}
+          <button
+            onClick={() => setDyn({ supplyLag: 8, demandElasticity: 0.1 })}
+            className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+          >
+            Ver la telaraña (L=8, εD=0.1)
+          </button>
+
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={sim.series} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>

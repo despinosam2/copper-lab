@@ -91,6 +91,15 @@ export function HybridView({ data }: { data: CopperRow[] }) {
         <Note>
           Este modelo usa ARIMAX para capturar la estructura lineal y covariables, y luego ajusta un GPR sobre los errores (residuos). Si ARIMAX ya explica casi todo, la mejora del GPR será cercana al 0%.
         </Note>
+
+        {/* R14: preset clicable — l grande ⇒ el GPR de residuos no puede
+            capturar estructura fina, la mejora tiende a 0%. */}
+        <button
+          onClick={() => setLengthScale(0.5)}
+          className="self-start px-3 py-1.5 text-xs font-medium font-body bg-slate-700 hover:bg-slate-600 text-ink-100 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+        >
+          Buscar mejora ≈ 0% (l=0.5)
+        </button>
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">
