@@ -7,6 +7,8 @@
 // para x < a+1, fracción continua para x >= a+1), no una librería de
 // estadística externa.
 
+import { invert } from './matrix';
+
 // ---------------------------------------------------------- Autocorrelación ----
 
 /**
@@ -116,4 +118,42 @@ export function ljungBox(residuals: number[], maxLag: number): LjungBoxResult {
   }
   q *= n * (n + 2);
   return { statistic: q, pValue: chiSquareUpperPValue(q, maxLag), df: maxLag };
+}
+
+// ------------------------------------------------------ Errores estándar ----
+
+/**
+ * R12: errores estándar OLS clásicos (homocedásticos) de los coeficientes β.
+ * SE(β_j) = sqrt(σ² · [(XᵀX)⁻¹]_jj), con σ² = RSS/(n-k).
+ *
+ * Limitación documentada (decisión explícita, no un descuido): dado que el
+ * modelo incorpora una estructura AR(1), los errores estándar OLS pueden no
+ * ser consistentes en presencia de autocorrelación serial. En este proyecto
+ * se mantienen los errores estándar clásicos para preservar la simplicidad y
+ * consistencia de la implementación. En consecuencia, los coeficientes
+ * estimados se utilizan principalmente con fines predictivos e
+ * interpretativos, mientras que las pruebas de significancia estadística
+ * deben interpretarse con cautela. En trabajos futuros podría emplearse un
+ * estimador robusto HAC (Newey–West) para mejorar la inferencia.
+ */
+export function standardErrors(X: number[][], residuals: number[], k: number): number[] {
+  const n = residuals.length;
+  const rss = residuals.reduce((s, e) => s + e * e, 0);
+  const sigma2 = rss / Math.max(n - k, 1);
+
+  const XtX: number[][] = Array(k).fill(0).map(() => Array(k).fill(0));
+  for (let a = 0; a < k; a++) {
+    for (let b = 0; b < k; b++) {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += X[i][a] * X[i][b];
+      XtX[a][b] = s;
+    }
+  }
+  const inv = invert(XtX);
+  return Array(k).fill(0).map((_, j) => Math.sqrt(Math.max(sigma2 * inv[j][j], 0)));
+}
+
+/** Estadístico t = β / SE(β) — para juzgar significancia (t grande ⇒ el coeficiente probablemente no es cero). */
+export function tStatistics(coefficients: number[], se: number[]): number[] {
+  return coefficients.map((b, j) => (se[j] > 0 ? b / se[j] : 0));
 }
