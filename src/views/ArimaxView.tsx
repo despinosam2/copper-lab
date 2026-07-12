@@ -28,9 +28,13 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
 
   const [autoTuning, setAutoTuning] = useState(false);
   const [tuneMsg, setTuneMsg] = useState<string | null>(null);
+  // R17: guardar la configuración previa al autoajuste para poder volver
+  // (antes, un clic destruía el trabajo del usuario sin deshacer).
+  const [preTuneArimax, setPreTuneArimax] = useState<typeof arimax | null>(null);
   const handleAutoTune = () => {
     setAutoTuning(true);
     setTuneMsg(null);
+    setPreTuneArimax(arimax);
     setTimeout(async () => {
       const best = await autoTuneArimaxBic(data);
       if (best) {
@@ -39,9 +43,17 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
         setTuneMsg(`BIC mínimo: p=${best.p}, d=${best.d}, ${nVars} covariable${nVars === 1 ? '' : 's'}.`);
       } else {
         setTuneMsg('Datos insuficientes para comparar los 576 candidatos.');
+        setPreTuneArimax(null); // no hubo cambio que deshacer
       }
       setAutoTuning(false);
     }, 0);
+  };
+  const handleRestore = () => {
+    if (preTuneArimax) {
+      setArimax(preTuneArimax);
+      setPreTuneArimax(null);
+      setTuneMsg(null);
+    }
   };
 
   const { chartData, metrics, coefficients, exogCoefficients, activeDefs, residuals, se, t } = useMemo(() => {
@@ -137,6 +149,14 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
             {autoTuning ? 'Calculando…' : 'Autoajustar (BIC)'}
           </button>
           {tuneMsg && <p className="text-patina-light text-xs mt-2 font-mono">{tuneMsg}</p>}
+          {preTuneArimax && !autoTuning && (
+            <button
+              onClick={handleRestore}
+              className="mt-2 w-full px-4 py-1.5 text-xs font-body text-ink-300 hover:text-ink-100 border border-slate-700 hover:border-slate-500 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+            >
+              Restaurar mi configuración (p={preTuneArimax.p}, d={preTuneArimax.d}, {activeExogDefs(preTuneArimax).length} covariable{activeExogDefs(preTuneArimax).length === 1 ? '' : 's'})
+            </button>
+          )}
           <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
             Prueba las 576 combinaciones de p, d y covariables, y elige la de menor BIC — un criterio
             que penaliza la complejidad. Ojo: el RMSE puro siempre "mejora" al agregar variables;

@@ -24,8 +24,14 @@ export function GprView({ data }: { data: CopperRow[] }) {
   const setBandSigma = (v: 1 | 2) => setGpr({ ...gpr, bandSigma: v });
 
   const [autoTuning, setAutoTuning] = useState(false);
+  // R17: el autoajuste sobreescribía la configuración del usuario sin
+  // posibilidad de volver — y el propio texto del botón invita a "comparar
+  // dónde te deja el algoritmo con dónde estabas tú", comparación que se
+  // destruía al ejecutarlo. Se guarda la config previa para restaurarla.
+  const [preTuneGpr, setPreTuneGpr] = useState<typeof gpr | null>(null);
   const handleAutoTune = () => {
     setAutoTuning(true);
+    setPreTuneGpr(gpr);
     // setTimeout(0): deja pintar "Calculando…" antes de iniciar la búsqueda
     // (autoTuneGpr además cede el hilo internamente durante la grilla).
     setTimeout(async () => {
@@ -35,6 +41,12 @@ export function GprView({ data }: { data: CopperRow[] }) {
       setGpr({ ...gpr, ...best });
       setAutoTuning(false);
     }, 0);
+  };
+  const handleRestore = () => {
+    if (preTuneGpr) {
+      setGpr(preTuneGpr);
+      setPreTuneGpr(null);
+    }
   };
 
   const { chartData, metrics } = useMemo(() => {
@@ -106,6 +118,14 @@ export function GprView({ data }: { data: CopperRow[] }) {
           >
             {autoTuning ? 'Calculando…' : 'Autoajustar (verosimilitud marginal)'}
           </button>
+          {preTuneGpr && !autoTuning && (
+            <button
+              onClick={handleRestore}
+              className="mt-2 w-full px-4 py-1.5 text-xs font-body text-ink-300 hover:text-ink-100 border border-slate-700 hover:border-slate-500 rounded-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+            >
+              Restaurar mi configuración (l={preTuneGpr.lengthScale.toFixed(2)}, σf²={preTuneGpr.signalVariance.toFixed(1)}, σn²={preTuneGpr.noiseVariance.toFixed(3)})
+            </button>
+          )}
           <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
             Busca los valores de l, σf² y σn² que mejor explican estos datos según el
             criterio estándar de la literatura (máxima verosimilitud marginal), en vez
