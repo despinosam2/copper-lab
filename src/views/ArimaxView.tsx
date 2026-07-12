@@ -13,6 +13,7 @@ import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { ResidualsPanel } from '../components/ResidualsPanel';
+import { standardErrors, tStatistics } from '../models/diagnostics';
 
 // R03: por defecto todo detectado (dataset sintético siempre trae las 6
 // columnas) — sólo difiere cuando App.tsx pasa el detectedColumns real de
@@ -43,7 +44,7 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
     }, 0);
   };
 
-  const { chartData, metrics, coefficients, exogCoefficients, activeDefs, residuals } = useMemo(() => {
+  const { chartData, metrics, coefficients, exogCoefficients, activeDefs, residuals, se, t } = useMemo(() => {
     const y = data.map(r => r.price);
     const exog = buildExogMatrix(data, arimax);
     const activeDefs = activeExogDefs(arimax);
@@ -62,7 +63,17 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
     // R11: residuos sólo del tramo predicho (mismo tramo que las métricas).
     const residuals = actual.map((v, i) => v - pred[i]);
 
-    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients, activeDefs, residuals };
+    // R12: SE/t sobre el espacio de estimación real (designMatrix/diffResiduals
+    // de fitArimax) — no sobre `residuals` de arriba, que está en otro espacio
+    // (reintegrado al nivel del precio) y en otro tramo.
+    const k = 1 + model.coefficients.length + model.exogCoefficients.length;
+    const beta = [model.intercept, ...model.coefficients, ...model.exogCoefficients];
+    const se = model.designMatrix.length > k
+      ? standardErrors(model.designMatrix, model.diffResiduals, k)
+      : Array(k).fill(0);
+    const t = tStatistics(beta, se);
+
+    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients, activeDefs, residuals, se, t };
   }, [data, arimax, p, d]);
 
   return (
@@ -134,7 +145,7 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
         </Panel>
 
         <Panel title="Coeficientes" eyebrow="ANÁLISIS">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mb-3">
             {coefficients.map((coef, idx) => (
               <Readout key={idx} label={`φ${idx + 1}`} value={coef.toFixed(3)} />
             ))}
@@ -148,6 +159,44 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
               )
             ))}
           </div>
+
+          {/* R12: errores estándar y t-stat — mismo orden que se/t: [intercepto, φ1..φp, β1..βN]. */}
+          <table className="w-full text-left font-body text-xs">
+            <thead>
+              <tr className="border-b border-slate-700 text-ink-500">
+                <th className="pb-2 font-medium">Coef.</th>
+                <th className="pb-2 font-medium text-right">SE</th>
+                <th className="pb-2 font-medium text-right">t</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coefficients.map((_, idx) => (
+                <tr key={`phi-${idx}`} className="border-b border-slate-800/50">
+                  <td className="py-1.5 text-ink-300 font-mono">φ{idx + 1}</td>
+                  <td className="py-1.5 text-right font-mono text-ink-100">{fmt(se[1 + idx])}</td>
+                  <td className="py-1.5 text-right font-mono text-ink-100">{fmt(t[1 + idx], 2)}</td>
+                </tr>
+              ))}
+              {activeDefs.map((def, idx) => (
+                exogCoefficients[idx] !== undefined && (
+                  <tr key={def.key} className="border-b border-slate-800/50">
+                    <td className="py-1.5 text-ink-300 font-mono">β ({def.shortLabel})</td>
+                    <td className="py-1.5 text-right font-mono text-ink-100">{fmt(se[1 + coefficients.length + idx])}</td>
+                    <td className="py-1.5 text-right font-mono text-ink-100">{fmt(t[1 + coefficients.length + idx], 2)}</td>
+                  </tr>
+                )
+              ))}
+            </tbody>
+          </table>
+          <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
+            Debido a que el modelo incorpora una estructura AR(1), los errores estándar OLS pueden no ser
+            consistentes en presencia de autocorrelación serial. En este proyecto se mantienen los errores
+            estándar clásicos para preservar la simplicidad y consistencia de la implementación. En
+            consecuencia, los coeficientes estimados se utilizan principalmente con fines predictivos e
+            interpretativos, mientras que las pruebas de significancia estadística deben interpretarse con
+            cautela. En trabajos futuros podría emplearse un estimador robusto HAC (Newey–West) para
+            mejorar la inferencia.
+          </p>
         </Panel>
       </div>
     </div>

@@ -1,7 +1,7 @@
 // R11/R12 (09 EXECUTION BLUEPRINT) — Tests de diagnostics.ts.
 
 import { describe, it, expect } from "vitest";
-import { autocorrelation, ljungBox, chiSquareUpperPValue } from "./diagnostics";
+import { autocorrelation, ljungBox, chiSquareUpperPValue, standardErrors, tStatistics } from "./diagnostics";
 import { generateSyntheticData } from "../data/generator";
 
 describe("chiSquareUpperPValue — contra valores críticos conocidos (95%)", () => {
@@ -56,5 +56,39 @@ describe("ljungBox", () => {
     const diffed = y.slice(1).map((v, i) => v - y[i]);
     const result = ljungBox(diffed, 4);
     expect(result.pValue).toBeGreaterThan(0.01);
+  });
+});
+
+describe("standardErrors — caso calculado a mano", () => {
+  // x = [0,1,2], y = [1,2,4]. Regresión simple con intercepto:
+  // pendiente=1.5, intercepto=5/6; residuos=[1/6,-1/3,1/6]; RSS=1/6; df=1.
+  // (XᵀX)⁻¹ = [[5/6,-1/2],[-1/2,1/2]] → SE(intercepto)=√(1/6·5/6)≈0.3727,
+  // SE(pendiente)=√(1/6·1/2)≈0.2887.
+  it("coincide con el cálculo manual", () => {
+    const X = [[1, 0], [1, 1], [1, 2]];
+    const residuals = [1 / 6, -1 / 3, 1 / 6];
+    const se = standardErrors(X, residuals, 2);
+    expect(se[0]).toBeCloseTo(0.3727, 3);
+    expect(se[1]).toBeCloseTo(0.2887, 3);
+  });
+
+  it("un ajuste exacto (residuos cero) da errores estándar cero", () => {
+    const X = [[1, 0], [1, 1], [1, 2]];
+    const se = standardErrors(X, [0, 0, 0], 2);
+    expect(se[0]).toBeCloseTo(0, 10);
+    expect(se[1]).toBeCloseTo(0, 10);
+  });
+});
+
+describe("tStatistics", () => {
+  it("t = β / SE(β)", () => {
+    const t = tStatistics([1.5, 0.8333], [0.2887, 0.3727]);
+    expect(t[0]).toBeCloseTo(1.5 / 0.2887, 3);
+    expect(t[1]).toBeCloseTo(0.8333 / 0.3727, 3);
+  });
+
+  it("SE=0 no produce Infinity/NaN (devuelve 0)", () => {
+    const t = tStatistics([1.5], [0]);
+    expect(t[0]).toBe(0);
   });
 });
