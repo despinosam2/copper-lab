@@ -72,7 +72,7 @@ export function HybridView({ data }: { data: CopperRow[] }) {
           <Chart 
             data={chartData}
             lines={[
-              { key: 'Actual', name: 'Observado', color: '#78838d', strokeWidth: 2, strokeDasharray: '4 4' },
+              { key: 'Actual', name: 'Observado', color: '#7d8892', strokeWidth: 2, strokeDasharray: '4 4' },
               // Violeta: distinguible del gris de "Observado" y del cobre de "Híbrido"
               // (antes casi calcaba el tono del observado y no se distinguía a simple vista).
               { key: 'ArimaxOnly', name: 'ARIMAX Base', color: '#9b8cd6', strokeWidth: 1.5, strokeDasharray: '3 3' },

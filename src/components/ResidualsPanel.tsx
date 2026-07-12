@@ -25,11 +25,11 @@ export function ResidualsPanel({ residuals }: { residuals: number[] }) {
         <p className="text-ink-500 text-sm font-body">Muy pocos residuos para diagnosticar.</p>
       ) : (
         <>
-          <div className="h-40">
+          <div className="h-40" role="img" aria-label={`Autocorrelación de los residuos en los rezagos 1 a ${acf.length}, con bandas de significancia de ±${band.toFixed(2)}`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={acf} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="lag" tick={{ fill: '#78838d', fontSize: 10, fontFamily: 'IBM Plex Mono' }} stroke="#28313b" />
-                <YAxis domain={[-1, 1]} tick={{ fill: '#78838d', fontSize: 10, fontFamily: 'IBM Plex Mono' }} stroke="#28313b" width={35} />
+                <XAxis dataKey="lag" tick={{ fill: '#7d8892', fontSize: 10, fontFamily: 'IBM Plex Mono' }} stroke="#28313b" />
+                <YAxis domain={[-1, 1]} tick={{ fill: '#7d8892', fontSize: 10, fontFamily: 'IBM Plex Mono' }} stroke="#28313b" width={35} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#171c22', border: '1px solid #28313b', borderRadius: '3px', color: '#e8ecef', fontFamily: 'IBM Plex Mono', fontSize: 12 }}
                   labelStyle={{ color: '#e8ecef' }}

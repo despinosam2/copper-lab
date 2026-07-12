@@ -96,7 +96,7 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
           <Chart 
             data={chartData}
             lines={[
-              { key: 'Actual', name: 'Observado', color: '#78838d', strokeWidth: 2, strokeDasharray: '4 4' },
+              { key: 'Actual', name: 'Observado', color: '#7d8892', strokeWidth: 2, strokeDasharray: '4 4' },
               { key: 'Model', name: 'Modelo', color: '#e0a274', strokeWidth: 2 }
             ]}
           />
