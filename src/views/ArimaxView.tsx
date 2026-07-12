@@ -12,6 +12,7 @@ import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { ResidualsPanel } from '../components/ResidualsPanel';
 
 // R03: por defecto todo detectado (dataset sintético siempre trae las 6
 // columnas) — sólo difiere cuando App.tsx pasa el detectedColumns real de
@@ -42,7 +43,7 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
     }, 0);
   };
 
-  const { chartData, metrics, coefficients, exogCoefficients, activeDefs } = useMemo(() => {
+  const { chartData, metrics, coefficients, exogCoefficients, activeDefs, residuals } = useMemo(() => {
     const y = data.map(r => r.price);
     const exog = buildExogMatrix(data, arimax);
     const activeDefs = activeExogDefs(arimax);
@@ -58,8 +59,10 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
     const actual = y.slice(p + d);
     const pred = model.fitted.slice(p + d);
     const metrics = calculateMetrics(actual, pred);
+    // R11: residuos sólo del tramo predicho (mismo tramo que las métricas).
+    const residuals = actual.map((v, i) => v - pred[i]);
 
-    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients, activeDefs };
+    return { chartData, metrics, coefficients: model.coefficients, exogCoefficients: model.exogCoefficients, activeDefs, residuals };
   }, [data, arimax, p, d]);
 
   return (
@@ -85,6 +88,8 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
         <Note>
           ARIMAX añade covariables al modelo base. Apaga todas las covariables (debería verse idéntico a ARIMA). Luego enciéndelas y observa el cambio en el error para evaluar si aportan información.
         </Note>
+
+        <ResidualsPanel residuals={residuals} />
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">

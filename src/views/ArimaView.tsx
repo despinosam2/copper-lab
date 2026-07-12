@@ -9,6 +9,7 @@ import { Chart } from '../components/Chart';
 import { Readout } from '../components/Readout';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
+import { ResidualsPanel } from '../components/ResidualsPanel';
 
 export function ArimaView({ data }: { data: CopperRow[] }) {
   const { arima, setArima } = useModelParams();
@@ -16,10 +17,10 @@ export function ArimaView({ data }: { data: CopperRow[] }) {
   const setP = (v: number) => setArima({ ...arima, p: v });
   const setD = (v: number) => setArima({ ...arima, d: v });
 
-  const { chartData, metrics, coefficients } = useMemo(() => {
+  const { chartData, metrics, coefficients, residuals } = useMemo(() => {
     const y = data.map(r => r.price);
     const model = fitArima(y, p, d);
-    
+
     // For ARIMA, fitted starts at p+d. We keep original y for history.
     const chartData = data.map((row, i) => ({
       date: row.date,
@@ -31,8 +32,10 @@ export function ArimaView({ data }: { data: CopperRow[] }) {
     const actual = y.slice(p + d);
     const pred = model.fitted.slice(p + d);
     const metrics = calculateMetrics(actual, pred);
+    // R11: residuos sólo del tramo predicho (mismo tramo que las métricas).
+    const residuals = actual.map((v, i) => v - pred[i]);
 
-    return { chartData, metrics, coefficients: model.coefficients };
+    return { chartData, metrics, coefficients: model.coefficients, residuals };
   }, [data, p, d]);
 
   return (
@@ -58,6 +61,8 @@ export function ArimaView({ data }: { data: CopperRow[] }) {
         <Note>
           El modelo ARIMA ajusta la serie usando sólo su propio pasado. Experimenta fijando p=2 y comparando d=0 vs d=1; observa cómo diferenciar mejora el ajuste de una serie con tendencia.
         </Note>
+
+        <ResidualsPanel residuals={residuals} />
       </div>
 
       <div className="col-span-1 flex flex-col gap-6">
