@@ -14,6 +14,7 @@ import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { DownloadCsvButton } from '../components/DownloadCsvButton';
+import { Term } from '../components/Term';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
@@ -592,7 +593,9 @@ export function ValidationView({ data, detectedColumns = ALL_DETECTED }: { data:
 
         <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
           Los folds dividen el tramo posterior al % de entrenamiento elegido: cada uno entrena con todo lo anterior a su
-          bloque de prueba y predice el bloque siguiente (origen rodante, ventana expansiva) — el k-fold barajado clásico
+          bloque de prueba y predice el bloque siguiente ({' '}
+          <Term def="Validación para series de tiempo: se entrena con el pasado y se prueba con el bloque que sigue, avanzando el origen del corte en cada fold. Nunca se entrena con datos posteriores a la prueba — por eso el k-fold barajado clásico es trampa aquí.">walk-forward</Term>
+          : origen rodante, ventana expansiva) — el k-fold barajado clásico
           es inválido en series de tiempo. La desviación σ entre folds mide la <strong>estabilidad</strong>: un modelo que
           gana en un corte y pierde en otro no es un ganador confiable.
         </p>

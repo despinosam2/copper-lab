@@ -9,6 +9,7 @@ import { Chart } from '../components/Chart';
 import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { DownloadCsvButton } from '../components/DownloadCsvButton';
+import { Term } from '../components/Term';
 
 const AUTOTUNE_BOUNDS = {
   lengthScale: [0.01, 0.5] as [number, number],
@@ -188,9 +189,11 @@ export function GprView({ data }: { data: CopperRow[] }) {
             </button>
           )}
           <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
-            Busca los valores de l, σf² y σn² que mejor explican estos datos según el
-            criterio estándar de la literatura (máxima verosimilitud marginal), en vez
-            de ajustarlos a ojo. Compara dónde los deja el algoritmo con dónde los
+            Busca los valores de l, σf² y{' '}
+            <Term def="Varianza de ruido: cuánto 'ruido de medición' asume el modelo en cada observación. Alto ⇒ el GPR suaviza más (no confía en los puntos); bajo ⇒ los persigue uno a uno (riesgo de sobreajuste).">σn²</Term>
+            {' '}que mejor explican estos datos según el criterio estándar de la literatura (máxima{' '}
+            <Term def="Probabilidad de los datos según el modelo, integrando sobre todas las curvas posibles del prior. Premia el ajuste y penaliza la complejidad automáticamente — por eso maximizarla no elige el modelo más flexible.">verosimilitud marginal</Term>
+            ), en vez de ajustarlos a ojo. Compara dónde los deja el algoritmo con dónde los
             habías dejado tú.
           </p>
         </Panel>
