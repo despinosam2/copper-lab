@@ -49,6 +49,17 @@ export interface GprState {
   noiseVariance: number;
   /** Ancho de la banda de incertidumbre: 1σ (68%, como la presentación del curso) o 2σ (95%). */
   bandSigma: 1 | 2;
+  /**
+   * R20: kernel compuesto opcional. 'rbf' (default histórico) o
+   * 'rbf+periodic' — RBF + kernel periódico con período fijo de 12
+   * observaciones (el ciclo anual del dataset sintético mensual). El período
+   * en unidades de x (12/(n−1)) lo calcula cada vista según su serie.
+   */
+  kernelMode: 'rbf' | 'rbf+periodic';
+  /** Escala de longitud del kernel periódico (lp). */
+  periodicLengthScale: number;
+  /** Varianza de la componente periódica (σp²). */
+  periodicVariance: number;
 }
 
 export interface HybridState {
@@ -157,7 +168,7 @@ export function ModelParamsProvider({ children, initial }: { children: ReactNode
     usePartLargas: false,
     ...initial?.arimax
   });
-  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2, ...initial?.gpr });
+  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2, kernelMode: 'rbf', periodicLengthScale: 1.0, periodicVariance: 0.3, ...initial?.gpr });
   const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1, ...initial?.hybrid });
   const [validation, setValidation] = useState<ValidationState>({
     trainPct: 80,

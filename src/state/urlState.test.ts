@@ -10,7 +10,7 @@ const sample: ShareableState = {
   dynamics: { demandElasticity: 0.1, supplyElasticity: 0.15, supplyLag: 8, priceSensitivity: 0.15, activityGrowth: 0.3, shockMagnitude: 10, shockQuarter: 8 },
   arima: { p: 3, d: 1 },
   arimax: { p: 2, d: 1, useGrowth: true, useUsd: false, useStocks: true, useLibor: false, usePartLargas: false },
-  gpr: { lengthScale: 0.05, signalVariance: 2.0, noiseVariance: 0.01, bandSigma: 1 },
+  gpr: { lengthScale: 0.05, signalVariance: 2.0, noiseVariance: 0.01, bandSigma: 1, kernelMode: 'rbf+periodic', periodicLengthScale: 1.5, periodicVariance: 0.4 },
   hybrid: { p: 2, d: 1, lengthScale: 0.3 },
   validation: { trainPct: 70, model: 'forest', folds: 5, gprMode: 'extrapolate', mlLags: 4, mlDiff: true, ridgeLambda: 0.5, knnK: 7, forestTrees: 80, forestDepth: 6 },
 };

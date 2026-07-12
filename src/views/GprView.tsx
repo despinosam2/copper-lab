@@ -18,11 +18,19 @@ const AUTOTUNE_BOUNDS = {
 
 export function GprView({ data }: { data: CopperRow[] }) {
   const { gpr, setGpr } = useModelParams();
-  const { lengthScale, signalVariance, noiseVariance, bandSigma } = gpr;
+  const { lengthScale, signalVariance, noiseVariance, bandSigma, kernelMode, periodicLengthScale, periodicVariance } = gpr;
   const setLengthScale = (v: number) => setGpr({ ...gpr, lengthScale: v });
   const setSignalVariance = (v: number) => setGpr({ ...gpr, signalVariance: v });
   const setNoiseVariance = (v: number) => setGpr({ ...gpr, noiseVariance: v });
   const setBandSigma = (v: 1 | 2) => setGpr({ ...gpr, bandSigma: v });
+
+  // R20: período de 12 observaciones (ciclo anual del dataset sintético
+  // mensual) en unidades del índice temporal normalizado x = i/(n−1).
+  const period = 12 / Math.max(data.length - 1, 1);
+  const gprParams = {
+    lengthScale, signalVariance, noiseVariance,
+    kernelMode, period, periodicLengthScale, periodicVariance
+  };
 
   const [autoTuning, setAutoTuning] = useState(false);
   // R17: el autoajuste sobreescribía la configuración del usuario sin
@@ -38,7 +46,12 @@ export function GprView({ data }: { data: CopperRow[] }) {
     setTimeout(async () => {
       const y = data.map(r => r.price);
       const x = Array(data.length).fill(0).map((_, i) => i / (data.length > 1 ? data.length - 1 : 1));
-      const best = await autoTuneGpr(x, y, AUTOTUNE_BOUNDS);
+      // R20: en modo compuesto, la grilla se extiende a lp y σp² (4 valores
+      // por dimensión — ver la resolución de rendimiento en autoTuneGpr).
+      const best = await autoTuneGpr(x, y, AUTOTUNE_BOUNDS, 6,
+        kernelMode === 'rbf+periodic'
+          ? { period, lpBounds: [0.1, 3.0], sp2Bounds: [0.01, 2.0] }
+          : undefined);
       setGpr({ ...gpr, ...best });
       setAutoTuning(false);
     }, 0);
@@ -54,7 +67,7 @@ export function GprView({ data }: { data: CopperRow[] }) {
     const y = data.map(r => r.price);
     const x = Array(data.length).fill(0).map((_, i) => i / (data.length > 1 ? data.length - 1 : 1));
 
-    const model = fitGpr(x, y, { lengthScale, signalVariance, noiseVariance });
+    const model = fitGpr(x, y, gprParams);
 
     const chartData = data.map((row, i) => {
       const stdDev = Math.sqrt(Math.max(0, model.variance[i]));
@@ -70,7 +83,8 @@ export function GprView({ data }: { data: CopperRow[] }) {
     const metrics = calculateMetrics(y, model.mean);
 
     return { chartData, metrics };
-  }, [data, lengthScale, signalVariance, noiseVariance, bandSigma]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, lengthScale, signalVariance, noiseVariance, bandSigma, kernelMode, periodicLengthScale, periodicVariance]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -124,6 +138,39 @@ export function GprView({ data }: { data: CopperRow[] }) {
           <Slider label="Escala de Longitud (l)" min={0.01} max={0.5} step={0.01} value={lengthScale} onChange={setLengthScale} />
           <Slider label="Varianza Señal (σf²)" min={0.1} max={5.0} step={0.1} value={signalVariance} onChange={setSignalVariance} />
           <Slider label="Varianza Ruido (σn²)" min={0.001} max={0.5} step={0.001} value={noiseVariance} onChange={setNoiseVariance} />
+
+          {/* R20: kernel compuesto opcional — captura la estacionalidad anual
+              que el RBF puro no puede representar (hallazgo A6). */}
+          <div className="mt-4">
+            <p className="font-body text-sm text-ink-300 mb-1.5">Kernel</p>
+            <div className="flex gap-2" role="group" aria-label="Modo de kernel">
+              {([['rbf', 'RBF'], ['rbf+periodic', 'RBF + periódico']] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  onClick={() => setGpr({ ...gpr, kernelMode: mode })}
+                  aria-pressed={kernelMode === mode}
+                  className={`flex-1 px-3 py-2 rounded-[3px] border font-body text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina ${
+                    kernelMode === mode
+                      ? 'border-patina text-patina-light bg-patina/10'
+                      : 'border-slate-700 text-ink-300 hover:text-ink-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {kernelMode === 'rbf+periodic' && (
+              <div className="mt-3">
+                <Slider label="Escala periódica (lp)" min={0.1} max={3.0} step={0.05} value={periodicLengthScale} onChange={v => setGpr({ ...gpr, periodicLengthScale: v })} />
+                <Slider label="Varianza periódica (σp²)" min={0.01} max={2.0} step={0.01} value={periodicVariance} onChange={v => setGpr({ ...gpr, periodicVariance: v })} />
+              </div>
+            )}
+            <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
+              {kernelMode === 'rbf+periodic'
+                ? 'RBF (tendencia suave) + kernel periódico con período fijo de 12 observaciones — el ciclo anual del dataset sintético mensual. Dos puntos separados exactamente un año se tratan como vecinos aunque estén lejos en el tiempo. Ojo: con datos trimestrales el ciclo anual es de 4 observaciones y este kernel no lo capturará.'
+                : 'El RBF puro no puede representar ciclos: la estacionalidad anual del dataset sintético (0.25·sin(2πt/12)) queda estructuralmente fuera de su alcance — prueba el kernel compuesto y compara el RMSE.'}
+            </p>
+          </div>
 
           <button
             onClick={handleAutoTune}
