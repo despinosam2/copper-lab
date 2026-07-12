@@ -1,5 +1,12 @@
 # 01 — PRD · Documento de Requisitos de Producto
 
+> **Enmienda v2 (jul 2026):** el alcance descrito abajo ("cinco modelos", sin
+> ampliarse) corresponde a la v1. La v2 amplió el alcance a 7 pestañas y 3
+> modelos ML adicionales (Ridge, k-NN, bosque aleatorio) — ver
+> [`07 VALIDACION SPEC.md`](07%20VALIDACION%20SPEC.md) y
+> [`08 MANUAL.md`](08%20MANUAL.md). El resto de este documento (objetivo,
+> usuarios, criterios de éxito) sigue vigente.
+
 ## Objetivo del producto
 
 COPPER LAB es un software educativo que enseña modelado de precios de commodities
