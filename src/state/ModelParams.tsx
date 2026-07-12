@@ -111,13 +111,30 @@ interface ModelParamsState {
 
 const ModelParamsContext = createContext<ModelParamsState | null>(null);
 
-export function ModelParamsProvider({ children }: { children: ReactNode }) {
+/**
+ * R19: estado inicial opcional (viene de un enlace compartido, ?config=).
+ * Cada bloque se mezcla sobre los defaults — un enlace de una versión vieja
+ * con campos ausentes cae a los defaults, nunca rompe (RNF-3). Sin `initial`,
+ * el comportamiento es idéntico al de siempre.
+ */
+export interface InitialModelParams {
+  structural?: Partial<StructuralState>;
+  dynamics?: Partial<DynamicsState>;
+  arima?: Partial<ArimaState>;
+  arimax?: Partial<ArimaxState>;
+  gpr?: Partial<GprState>;
+  hybrid?: Partial<HybridState>;
+  validation?: Partial<ValidationState>;
+}
+
+export function ModelParamsProvider({ children, initial }: { children: ReactNode; initial?: InitialModelParams }) {
   const [structural, setStructural] = useState<StructuralState>({
     growth: 2.5,
     supplyInterruptPct: 5,
     inventory: 4,
     usdIndex: 100,
-    energyCost: 1
+    energyCost: 1,
+    ...initial?.structural
   });
   const [dynamics, setDynamics] = useState<DynamicsState>({
     demandElasticity: 0.3,
@@ -126,9 +143,10 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     priceSensitivity: 0.15,
     activityGrowth: 0.3,
     shockMagnitude: 10,
-    shockQuarter: 8
+    shockQuarter: 8,
+    ...initial?.dynamics
   });
-  const [arima, setArima] = useState<ArimaState>({ p: 2, d: 1 });
+  const [arima, setArima] = useState<ArimaState>({ p: 2, d: 1, ...initial?.arima });
   const [arimax, setArimax] = useState<ArimaxState>({
     p: 2,
     d: 1,
@@ -136,10 +154,11 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     useUsd: true,
     useStocks: false,
     useLibor: false,
-    usePartLargas: false
+    usePartLargas: false,
+    ...initial?.arimax
   });
-  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2 });
-  const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1 });
+  const [gpr, setGpr] = useState<GprState>({ lengthScale: 0.1, signalVariance: 1.0, noiseVariance: 0.05, bandSigma: 2, ...initial?.gpr });
+  const [hybrid, setHybrid] = useState<HybridState>({ p: 2, d: 1, lengthScale: 0.1, ...initial?.hybrid });
   const [validation, setValidation] = useState<ValidationState>({
     trainPct: 80,
     model: 'arimax',
@@ -150,7 +169,8 @@ export function ModelParamsProvider({ children }: { children: ReactNode }) {
     ridgeLambda: 0.1,
     knnK: 5,
     forestTrees: 50,
-    forestDepth: 5
+    forestDepth: 5,
+    ...initial?.validation
   });
 
   return (

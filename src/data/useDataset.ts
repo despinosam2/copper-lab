@@ -13,9 +13,10 @@ const SYNTHETIC_DETECTED_COLUMNS: DetectedColumns = {
   partLargas: true
 };
 
-export function useDataset() {
-  const [seed, setSeed] = useState(42);
-  const [noise, setNoise] = useState(0.1);
+// R19: seed/noise iniciales opcionales (vienen de un enlace compartido).
+export function useDataset(initialSeed = 42, initialNoise = 0.1) {
+  const [seed, setSeed] = useState(initialSeed);
+  const [noise, setNoise] = useState(initialNoise);
   const [importedData, setImportedData] = useState<CopperRow[] | null>(null);
   const [detectedColumns, setDetectedColumns] = useState<DetectedColumns>(SYNTHETIC_DETECTED_COLUMNS);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

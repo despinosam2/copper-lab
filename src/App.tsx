@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDataset } from './data/useDataset';
 import { CopperRow } from './data/generator';
 import { DetectedColumns } from './data/parser';
-import { ModelParamsProvider } from './state/ModelParams';
+import { ModelParamsProvider, useModelParams } from './state/ModelParams';
+import { encodeState, decodeState } from './state/urlState';
 import { StructuralView } from './views/StructuralView';
 import { ArimaView } from './views/ArimaView';
 import { ArimaxView } from './views/ArimaxView';
@@ -23,8 +24,39 @@ const TABS = [
   { id: '07', name: 'Predicción', component: ValidationView }
 ];
 
+// R19: si la URL trae ?config= (enlace compartido), se decodifica UNA vez al
+// cargar el módulo — antes del primer render, para que useState/Provider
+// arranquen ya con esos valores. Un enlace corrupto devuelve null y la app
+// abre con los defaults (RNF-3).
+const sharedConfig = decodeState(new URLSearchParams(window.location.search).get('config'));
+
+// R19: botón "Copiar enlace" — vive DENTRO del provider (necesita leer el
+// contexto completo para serializarlo).
+function ShareLinkButton({ seed, noise, disabled }: { seed: number; noise: number; disabled: boolean }) {
+  const { structural, dynamics, arima, arimax, gpr, hybrid, validation } = useModelParams();
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    const encoded = encodeState({ seed, noise, structural, dynamics, arima, arimax, gpr, hybrid, validation });
+    const url = `${window.location.origin}${window.location.pathname}?config=${encodeURIComponent(encoded)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      disabled={disabled}
+      title={disabled ? 'Los enlaces sólo cubren el dataset sintético (un archivo importado no puede viajar en una URL)' : 'Copia una URL que abre la app con esta configuración exacta'}
+      className="px-3 py-1.5 text-sm font-body text-ink-300 hover:text-ink-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-slate-700 rounded-[3px] hover:border-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina"
+    >
+      {copied ? '¡Enlace copiado!' : 'Copiar enlace'}
+    </button>
+  );
+}
+
 export default function App() {
-  const dataset = useDataset();
+  const dataset = useDataset(sharedConfig?.seed, sharedConfig?.noise);
   const [activeTab, setActiveTab] = useState(0);
 
   // R03: sólo ArimaxView (y, en R03-T5, ValidationView) leen detectedColumns;
@@ -36,7 +68,7 @@ export default function App() {
   }>;
 
   return (
-    <ModelParamsProvider>
+    <ModelParamsProvider initial={sharedConfig ?? undefined}>
     <div className="min-h-screen flex flex-col items-center">
       <div className="w-full max-w-6xl px-4 py-8 flex flex-col gap-8">
         
@@ -127,8 +159,9 @@ export default function App() {
           
           <div className="flex flex-col items-end gap-2 shrink-0">
             <div className="flex gap-2">
+              <ShareLinkButton seed={dataset.seed} noise={dataset.noise} disabled={dataset.isImported} />
               {dataset.isImported && (
-                <button 
+                <button
                   onClick={dataset.clearImport}
                   className="px-3 py-1.5 text-sm font-body text-ink-300 hover:text-ink-100 transition-colors border border-slate-700 rounded-[3px] hover:border-slate-500"
                 >
