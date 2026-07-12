@@ -22,24 +22,29 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
     // El híbrido no tiene toggles propios (pestaña 05): usa siempre las 5 exógenas disponibles.
     const allExog = data.map(r => [r.globalGrowth, r.usdIndex, r.stocks, r.libor, r.partLargas]);
 
-    // Cada modelo se evalúa sólo sobre su tramo predicho (los primeros p+d
-    // puntos no tienen predicción en los autorregresivos).
-    const metricsFrom = (fitted: number[], start: number) =>
-      calculateMetrics(y.slice(start), fitted.slice(start));
+    // R16 (hallazgo A8): MUESTRA COMÚN. Antes cada modelo se evaluaba desde
+    // su propio p+d (y el GPR desde t=0) — RMSEs calculados sobre subconjuntos
+    // distintos de la serie, la impureza que el propio autoajuste BIC
+    // (arimaxTune.ts) prohíbe "para que ningún modelo gane por evaluarse en
+    // menos puntos". Ahora los cuatro se evalúan desde el mismo t inicial:
+    // el mayor p+d entre los modelos autorregresivos comparados.
+    const commonStart = Math.max(arima.p + arima.d, arimax.p + arimax.d, hybrid.p + hybrid.d);
+    const metricsFrom = (fitted: number[]) =>
+      calculateMetrics(y.slice(commonStart), fitted.slice(commonStart));
 
     // ARIMA — configuración de la pestaña 02
     const mArima = fitArima(y, arima.p, arima.d);
-    const metArima = metricsFrom(mArima.fitted, arima.p + arima.d);
+    const metArima = metricsFrom(mArima.fitted);
 
     // ARIMAX — configuración de la pestaña 03 (incluye toggles de covariables)
     const axExog = buildExogMatrix(data, arimax);
     const axCovars = activeExogDefs(arimax).map(def => def.shortLabel);
     const mArimax = fitArimax(y, axExog, arimax.p, arimax.d);
-    const metArimax = metricsFrom(mArimax.fitted, arimax.p + arimax.d);
+    const metArimax = metricsFrom(mArimax.fitted);
 
     // GPR — configuración de la pestaña 04
     const mGpr = fitGpr(x_gpr, y, gpr);
-    const metGpr = metricsFrom(mGpr.mean, 0);
+    const metGpr = metricsFrom(mGpr.mean);
 
     // Híbrido — configuración de la pestaña 05 (σf² y σn² fijos como en esa vista)
     const mHyb = fitHybrid(y, allExog, hybrid.p, hybrid.d, {
@@ -47,7 +52,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
       signalVariance: 1.0,
       noiseVariance: 0.05
     });
-    const metHyb = metricsFrom(mHyb.fitted, hybrid.p + hybrid.d);
+    const metHyb = metricsFrom(mHyb.fitted);
 
     const results = [
       { name: 'ARIMA', config: `p=${arima.p} · d=${arima.d}`, ...metArima },
@@ -73,7 +78,7 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
     // JS — se filtra antes de comparar.
     const rmseValues = results.filter((r): r is typeof r & { rmse: number } => r.rmse !== null).map(r => r.rmse);
     const minRmse = rmseValues.length > 0 ? Math.min(...rmseValues) : null;
-    return { results, minRmse };
+    return { results, minRmse, commonStart };
   }, [data, arima, arimax, gpr, hybrid]);
 
   return (
@@ -112,6 +117,11 @@ export function ComparatorView({ data }: { data: CopperRow[] }) {
             </tbody>
           </table>
         </div>
+        <p className="text-ink-500 text-xs mt-3 font-body leading-relaxed">
+          Los cuatro modelos se evalúan sobre la <strong>misma muestra</strong> (t ≥ {comparison.commonStart},
+          el mayor p+d entre los comparados) — así ningún modelo gana por evaluarse en menos puntos, el mismo
+          criterio que usa el autoajuste por BIC.
+        </p>
       </Panel>
       <Note>
         Menor RMSE en el ajuste no garantiza mejor generalización. Un buen modelo debe equilibrar ajuste, interpretabilidad y honestidad sobre su incertidumbre. Observa qué pasa si cambias los datos (semilla/ruido).
