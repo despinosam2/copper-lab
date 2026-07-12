@@ -13,6 +13,7 @@ import { HybridView } from './views/HybridView';
 import { ComparatorView } from './views/ComparatorView';
 import { ValidationView } from './views/ValidationView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { WelcomeTour, seenTour } from './components/WelcomeTour';
 
 const TABS = [
   { id: '01', name: 'Estructural', component: StructuralView },
@@ -58,6 +59,10 @@ function ShareLinkButton({ seed, noise, disabled }: { seed: number; noise: numbe
 export default function App() {
   const dataset = useDataset(sharedConfig?.seed, sharedConfig?.noise);
   const [activeTab, setActiveTab] = useState(0);
+  // R23: tour de primera visita (no aparece si viene de un enlace compartido
+  // — quien recibe un ?config= viene a ver un escenario concreto, no a que
+  // lo interrumpa un tour).
+  const [showTour, setShowTour] = useState(() => !seenTour() && !sharedConfig);
 
   // R03: sólo ArimaxView (y, en R03-T5, ValidationView) leen detectedColumns;
   // las demás vistas la ignoran a runtime como cualquier prop no declarada.
@@ -86,15 +91,26 @@ export default function App() {
           </div>
           {/* R14: la guía de estudio vive en el repo, no en la app — sin este
               enlace, un estudiante sin el profesor al lado no sabría que existe. */}
-          <a
-            href="https://github.com/despinosam2/copper-lab/blob/main/GUIA%20DE%20ESTUDIO.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-body text-ink-500 hover:text-patina-light underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina rounded-sm"
-          >
-            Guía de estudio (8 noches)
-          </a>
+          <div className="flex flex-col items-end gap-1">
+            <a
+              href="https://github.com/despinosam2/copper-lab/blob/main/GUIA%20DE%20ESTUDIO.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-body text-ink-500 hover:text-patina-light underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina rounded-sm"
+            >
+              Guía de estudio (8 noches)
+            </a>
+            {/* R23: reabrir el tour a demanda. */}
+            <button
+              onClick={() => setShowTour(true)}
+              className="text-xs font-body text-ink-500 hover:text-patina-light underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-patina rounded-sm"
+            >
+              Ver introducción
+            </button>
+          </div>
         </header>
+
+        {showTour && <WelcomeTour onClose={() => setShowTour(false)} />}
 
         {/* Dataset Bar — F1: semilla, ruido, importar CSV/Excel (01 PRD) */}
         <div className="bg-slate-850 border border-slate-700 rounded-[3px] p-4 flex flex-col md:flex-row gap-6 md:items-center justify-between">

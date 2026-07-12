@@ -14,6 +14,7 @@ import { Note } from '../components/Note';
 import { fmt } from '../components/format';
 import { ResidualsPanel } from '../components/ResidualsPanel';
 import { DownloadCsvButton } from '../components/DownloadCsvButton';
+import { Term } from '../components/Term';
 import { standardErrors, tStatistics } from '../models/diagnostics';
 
 // R03: por defecto todo detectado (dataset sintético siempre trae las 6
@@ -192,8 +193,9 @@ export function ArimaxView({ data, detectedColumns = ALL_DETECTED }: { data: Cop
             </button>
           )}
           <p className="text-ink-500 text-xs mt-2 font-body leading-relaxed">
-            Prueba las 576 combinaciones de p, d y covariables, y elige la de menor BIC — un criterio
-            que penaliza la complejidad. Ojo: el RMSE puro siempre "mejora" al agregar variables;
+            Prueba las 576 combinaciones de p, d y covariables, y elige la de menor{' '}
+            <Term def="Criterio de información bayesiano: mide el ajuste penalizando el número de parámetros. Comparar BICs pregunta si la mejora del ajuste justifica la complejidad extra — el RMSE puro nunca hace esa pregunta.">BIC</Term>
+            {' '}— un criterio que penaliza la complejidad. Ojo: el RMSE puro siempre "mejora" al agregar variables;
             el BIC pregunta si la mejora justifica los parámetros extra.
           </p>
         </Panel>
